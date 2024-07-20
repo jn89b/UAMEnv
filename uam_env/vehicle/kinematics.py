@@ -1,15 +1,19 @@
 import copy 
 import casadi as ca
 from collections import deque
-from typing import List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
-from uam_env.corridor.corridor import Corridor
+# from uam_env.corridor.corridor import Corridor
 from uam_env.utils import Vector
 from uam_env.config import kinematics_config
+from uam_env.vehicle.objects import CorridorObject
+
+if TYPE_CHECKING:
+    from uam_env.corridor.corridor import Corridor
 
 import numpy as np
 
-class Vehicle():
+class Vehicle(CorridorObject):
     """
     A moving vehicle in the environment 
     This vehicle represents the kinematics of a non-holonomic fixed-wing aircraft
@@ -22,13 +26,17 @@ class Vehicle():
     HISTORY_SIZE = kinematics_config.HISTORY_SIZE #Size of the history buffer
     
     def __init__(self,
-                 corridor:Corridor,
+                 corridor:"Corridor",
                  position:Vector,
-                 heading:float = 0,
+                 roll_dg:float = 0,
+                 pitch_dg:float = 0,
+                 heading_dg:float = 0,
                  speed:float = 15) -> None:
         self.corridor = corridor
         self.position = position
-        self.heading = heading
+        self.heading = heading_dg
+        self.pitch_dg = pitch_dg
+        self.roll_dg = roll_dg
         self.speed = speed
                 
         # this is for 
@@ -41,7 +49,7 @@ class Vehicle():
     @classmethod
     def create_random(
         cls,
-        corridor:Corridor,
+        corridor:"Corridor",
         speed: float = None,
     ) -> "Vehicle":
         """
@@ -54,10 +62,6 @@ class Vehicle():
         lane_to_use = np.random.choice(lane_names)
         
         
-import numpy as np
-import casadi as ca
-from matplotlib import pyplot as plt
-
 class DataHandler():
     def __init__(self) -> None:
         self.x = []

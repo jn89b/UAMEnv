@@ -32,9 +32,22 @@ class StraightLane(object):
         self.end = end
         self.width_m = width_m
         self.height_m = height_m
+        self.length_m = np.linalg.norm(self.end - self.start)
+        self.direction = (self.end - self.start) / self.length_m
+        self.direction_lateral = np.array([-self.direction[1], 
+                                           self.direction[0], 
+                                           0])
+        
         self.heading_rad = np.arctan2(self.start[1] - self.end[1], 
                                   self.start[0] - self.end[0])
         self.init_boundaries()
+        
+    
+    def position(self, longitudinal:float, lateral:float) -> Vector:
+        """
+        Get the position of the vehicle in the lane
+        """
+        return self.start + longitudinal * self.direction + lateral * self.direction_lateral
         
     def init_boundaries(self) -> Dict[str, Tuple[Vector, Vector]]:
         """
@@ -62,6 +75,16 @@ class StraightLane(object):
         
         return start_lateral, end_lateral
     
+    def local_coordinates(self, position:Vector) -> Tuple[float, float]:
+        """
+        Get the local coordinates of the vehicle in the lane
+        """
+        delta = position - self.start
+        longitudinal = np.dot(delta, self.direction)
+        lateral = np.dot(delta, self.direction_lateral)
+        
+        return longitudinal, lateral
+    
     def create_vertical_boundary(self) -> Tuple[Vector, Vector]:
         """
         Create the vertical boundary of the lane
@@ -76,7 +99,7 @@ class StraightLane(object):
         
         return start_vertical, end_vertical
         
-class Lanes(object):
+class LaneNetwork(object):
     """
     For now lets keep it simple and make 4 lanes
     """
@@ -162,6 +185,66 @@ class Lanes(object):
         }
         
     
+    def closest_position_on_lane(self,
+                                    position:Vector,
+                                    heading_dg:Optional[float] = None,
+                                    ) -> Tuple[str, Vector]:
+        """
+        Get the closest position on the lane
+        :param position: The position of the agent
+        :param heading_dg: The heading of the agent
+        :return: The name of the lane and the position on the lane
+        """
+        closest_points = []
+        distances = []
+        for zone_name, straight_lane in self.lanes.items():
+            longitudinal, lateral = straight_lane.local_coordinates(position)
+            print("Longitudinal: ", longitudinal)
+            print("Lateral: ", lateral)
+            closest_position = straight_lane.position(longitudinal, lateral)
+            closest_points.append(closest_position)
+            distances.append(np.linalg.norm(closest_position - position))
+        
+        min_index = np.argmin(distances)
+        return list(self.lanes.keys())[min_index], closest_points[min_index]
+
+    def closest_point_on_lane(self,
+                              origin:Vector,
+                              direction:Vector,
+                              position:Vector) -> Vector:
+        
+        t = np.dot(position - origin, direction) / np.dot(direction, direction)
+        t = max(t, 0)
+        Q = origin + t * direction
+        return Q
+
+    def get_closest_lane(self, 
+                         position:Vector,
+                         heading_dg: Optional[float] = None,
+                         ) -> Tuple[str, StraightLane]:
+        """
+        Get the closest lane to the agent 
+        :param position: The position of the agent
+        :param heading_dg: The heading of the agent
+        :return: The name of the lane and the lane object
+        """
+        # close_lane, min_distance = self.closest_position_on_lane(
+        #     position, heading_dg)
+        
+        closest_points = []
+        distances = []
+        for zone_name, lane in self.lanes.items():
+            start = lane.start
+            end = lane.end
+            point = self.closest_point_on_lane(
+                start, end, position)
+            closest_points.append(point)
+            distances.append(np.linalg.norm(point - position))
+            
+        close_lane = list(self.lanes.keys())[np.argmin(distances)]
+    
+        return close_lane, self.lanes[close_lane]
+            
     def straight_lanes(
         self, 
         num_lanes:int = 4,
@@ -192,13 +275,14 @@ class Corridor(object):
     
     """
     def __init__(self,
-                 lanes:Lanes = None,
+                 lanes:LaneNetwork = None,
                  vehicles:Vehicle = None,
                  corridor_objects:List[CorridorObject] = None,
                  np_random: np.random.RandomState = None,
                  record_history:bool = None) -> None:
         if lanes == None:
-            self.lanes = Lanes()
+            print("Creating new lanes")
+            self.lanes = LaneNetwork()
             self.lanes.straight_lanes()
         else:
             self.lanes = lanes

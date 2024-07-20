@@ -3,7 +3,8 @@ Idiot test to make sure corridors are created correctly
 """
 from typing import Tuple, Dict
 import matplotlib.pyplot as plt
-from uam_env.corridor.corridor import StraightLane, Lanes, Corridor
+import numpy as np
+from uam_env.corridor.corridor import StraightLane, LaneNetwork, Corridor
 from uam_env.config import lane_config
 
 import matplotlib.pyplot as plt
@@ -12,7 +13,7 @@ class Visualizer(object):
     def __init__(self) -> None:
         pass
     
-    def show_lanes_2D(self, lanes:Lanes) -> Tuple[plt.Figure, plt.Axes]:
+    def show_lanes_2D(self, lanes:LaneNetwork) -> Tuple[plt.Figure, plt.Axes]:
         fig, ax = plt.subplots()
         for key, straight_lane in lanes.lanes.items():
             if 'vertical' in key:
@@ -30,7 +31,7 @@ class Visualizer(object):
         
         return fig, ax
 
-    def show_lanes_3d(self, lanes:Lanes) -> Tuple[plt.Figure, plt.Axes]:
+    def show_lanes_3d(self, lanes:LaneNetwork) -> Tuple[plt.Figure, plt.Axes]:
         fig, ax = plt.subplots(subplot_kw={'projection': '3d'})
         for key, straight_lane in lanes.lanes.items():
             x = [straight_lane.start[0], straight_lane.end[0]]
@@ -41,33 +42,18 @@ class Visualizer(object):
         
         return fig, ax
 
+plt.close('all')
 
 corridor = Corridor()
 lanes = corridor.lanes
 
+position = np.array([5, 20, 0])
+lane_name, lane_object = corridor.lanes.get_closest_lane(position)
+
+print("Closest lane to position: ", lane_name)
+
 vis = Visualizer()
 fig, ax = vis.show_lanes_2D(lanes)
+ax.scatter(position[0], position[1], color='red')
+
 plt.show()
-# lanes = Lanes()
-# lanes.straight_lanes(length_m=30)
-
-
-# # Create a 3D plot
-# fig, ax = plt.subplots(subplot_kw={'projection': '3d'})
-# for key, straight_lane in lanes.lanes.items():
-#     print(key, straight_lane.start, straight_lane.end)
-#     x = [straight_lane.start[0], straight_lane.end[0]]
-#     y = [straight_lane.start[1], straight_lane.end[1]]
-#     z = [straight_lane.start[2], straight_lane.end[2]]
-#     ax.plot(x, y, z, label=key)
-# ax.legend()
-
-# fig, ax = plt.subplots()
-# for key, straight_lane in lanes.lanes.items():
-#     if 'vertical' in key:
-#         continue
-#     x = [straight_lane.start[0], straight_lane.end[0]]
-#     y = [straight_lane.start[1], straight_lane.end[1]]
-#     ax.plot(x, y, label=key)
-# ax.legend()
-# plt.show()
