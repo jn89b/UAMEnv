@@ -2,7 +2,7 @@ import logging
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 from uam_env.utils import Vector
 from uam_env.config import lane_config
-from uam_env.vehicle.kinematics import Kinematics
+from uam_env.vehicle.kinematics import Vehicle
 from uam_env.vehicle.objects import CorridorObject
 import numpy as np
 
@@ -193,7 +193,7 @@ class Corridor(object):
     """
     def __init__(self,
                  lanes:Lanes = None,
-                 vehicles:Kinematics = None,
+                 vehicles:Vehicle = None,
                  corridor_objects:List[CorridorObject] = None,
                  np_random: np.random.RandomState = None,
                  record_history:bool = None) -> None:
