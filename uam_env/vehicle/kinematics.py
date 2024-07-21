@@ -1,5 +1,6 @@
 import copy 
 import casadi as ca
+import random
 from collections import deque
 from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
@@ -51,17 +52,63 @@ class Vehicle(CorridorObject):
         cls,
         corridor:"Corridor",
         speed: float = None,
+        lane_from: Optional[str] = None,
+        lane_to: Optional[str] = None,
+        lane_id: Optional[int] = None,
+        spacing: float = 0.0
     ) -> "Vehicle":
         """
-        Create a random vehicle
+        Create a random vehicle on the road.
+
+        The lane and /or speed are chosen randomly, 
+        while longitudinal position is chosen behind the last
+        vehicle in the road with density based on the number of lanes.
+
+        :param road: the road where the vehicle is driving
+        :param speed: initial speed in [m/s]. If None, will be chosen randomly
+        :param lane_from: start node of the lane to spawn in
+        :param lane_to: end node of the lane to spawn in
+        :param lane_id: id of the lane to spawn in
+        :param spacing: ratio of spacing to the front vehicle, 1 being the default
+        :return: A vehicle with random position and/or speed
         """
         if speed is None:
             speed = np.random.uniform(cls.MIN_SPEED_MS, cls.MAX_SPEED_MS)
+        
+        lane_names = list(corridor.lane_network.lanes.keys())
+        _from = lane_from or random.choice(lane_names)
+        _to = lane_to or random.choice(lane_names)
+        _id = _from
+        lane = corridor.lane_network.lanes[_from]
+        if speed is None:
+            speed = np.random.uniform(
+                cls.MIN_SPEED_MS, 
+                cls.MAX_SPEED_MS)
+
+        default_spacing = kinematics_config.BUFFER_SPACING_M \
+            + (1 * speed)
             
-        lane_names = list(corridor.lanes.keys())
-        lane_to_use = np.random.choice(lane_names)
+        # position = lane.position(
+        #     longitudinal=lane.length_m,
+        #     lateral=0
+        # )
+        offset = spacing*default_spacing   
+        if len(corridor.vehicles):
+            x0 = np.max([v.position[0] for v in corridor.vehicles])
+        else:
+            x0 = 3 * default_spacing     
+
+        x0 += offset * corridor.np_random.uniform(0.8, 1.2)
+        position = lane.position(longitudinal=x0,lateral=0)
+
+        lane_heading = lane.heading_at()
+        vehicle = cls(corridor=corridor, 
+                      position=position, 
+                      speed=speed,
+                      heading_dg=np.rad2deg(lane_heading))
         
-        
+        return vehicle 
+
 class DataHandler():
     def __init__(self) -> None:
         self.x = []

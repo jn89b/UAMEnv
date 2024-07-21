@@ -1,7 +1,7 @@
 import logging
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 from uam_env.utils import Vector
-from uam_env.config import lane_config
+from uam_env.config import lane_config, kinematics_config
 from uam_env.vehicle.kinematics import Vehicle
 from uam_env.vehicle.objects import CorridorObject
 import numpy as np
@@ -43,11 +43,38 @@ class StraightLane(object):
         self.init_boundaries()
         
     
+    def on_lane(self,
+                position:Vector,
+                longitudinal: float = None,
+                lateral:float = None,
+                margin:float = 0,
+                vehicle_length_m:float = kinematics_config.LENGTH_m) -> bool:
+        """
+        Whether a given world position is on the lane.
+
+        :param position: a world position [m]
+        :param longitudinal: (optional) the corresponding longitudinal lane coordinate, if known [m]
+        :param lateral: (optional) the corresponding lateral lane coordinate, if known [m]
+        :param margin: (optional) a supplementary margin around the lane width
+        :return: is the position on the lane?
+        """
+        if longitudinal is None or lateral is None:
+            longitudinal, lateral = self.local_coordinates(position)
+        
+        # check if the vehicle is within the lane
+        if np.abs(lateral) > self.width_m / 2 + margin and \
+                np.abs(lateral) > self.width_m / 2 + vehicle_length_m / 2:
+            return False
+        
+        return True
+        
     def position(self, longitudinal:float, lateral:float) -> Vector:
         """
         Get the position of the vehicle in the lane
         """
-        return self.start + longitudinal * self.direction + lateral * self.direction_lateral
+        return (self.start 
+                + longitudinal * self.direction 
+                + lateral * self.direction_lateral)
         
     def init_boundaries(self) -> Dict[str, Tuple[Vector, Vector]]:
         """
@@ -98,6 +125,12 @@ class StraightLane(object):
         end_vertical = self.end + normal_vector * self.height_m
         
         return start_vertical, end_vertical
+        
+    def heading_at(self, longitudinal:float=None) -> float:
+        """
+        Get the heading of the lane at a given longitudinal position
+        """
+        return self.heading_rad
         
 class LaneNetwork(object):
     """
@@ -275,18 +308,16 @@ class Corridor(object):
     
     """
     def __init__(self,
-                 lanes:LaneNetwork = None,
-                 vehicles:Vehicle = None,
+                 lane_network:LaneNetwork = None,
+                 vehicles:List[Vehicle] = None,
                  corridor_objects:List[CorridorObject] = None,
                  np_random: np.random.RandomState = None,
                  record_history:bool = None) -> None:
-        if lanes == None:
-            print("Creating new lanes")
-            self.lanes = LaneNetwork()
-            self.lanes.straight_lanes()
+        if lane_network == None:
+            self.lane_network = LaneNetwork()
+            self.lane_network.straight_lanes()
         else:
-            self.lanes = lanes
-            
+            self.lane_network = lane_network
         self.vehicles = vehicles or []
         self.objects = corridor_objects or []
         self.np_random = np_random if np_random else np.random.RandomState()

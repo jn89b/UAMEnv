@@ -1,5 +1,7 @@
 """
 Idiot test to make sure corridors are created correctly
 """
+import gymnasium as gym
+import pytest
 
-from uam_env.corridor.corridor import StraightLane, LaneNetwork
+import uam_env

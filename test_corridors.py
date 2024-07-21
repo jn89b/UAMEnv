@@ -45,10 +45,10 @@ class Visualizer(object):
 plt.close('all')
 
 corridor = Corridor()
-lanes = corridor.lanes
+lanes = corridor.lane_network
 
 position = np.array([5, 20, 0])
-lane_name, lane_object = corridor.lanes.get_closest_lane(position)
+lane_name, lane_object = corridor.lane_network.get_closest_lane(position)
 
 print("Closest lane to position: ", lane_name)
 
