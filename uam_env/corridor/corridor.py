@@ -23,6 +23,7 @@ class StraightLane(object):
     A straight lane in the corridor
     TODO: Add vertical and lateral boundaries to the lane from the centerline 
     """
+    speed_limit = lane_config.SPEED_LIMIT_MPS
     def __init__(self,
                  start:Vector,
                  end:Vector,
@@ -324,3 +325,39 @@ class Corridor(object):
         self.np_random = np_random if np_random else np.random.RandomState()
         self.record_history = record_history
     
+    def neighbor_vehicles(self, ego_vehicle:"Vehicle",
+                          lane_index:str) -> Tuple[Optional["Vehicle"], Optional["Vehicle"]]:
+        """
+        Find the preceding and following vehicles of a given vehicle.
+
+        :param vehicle: the vehicle whose neighbours must be found
+        :param lane_index: the lane on which to look for preceding and following vehicles.
+                     It doesn't have to be the current vehicle lane but can also be another lane, 
+                     in which case the vehicle is projected on it 
+                     considering its local coordinates in the lane.
+        :return: its preceding vehicle, its following vehicle
+        """
+        lane_index = lane_index or ego_vehicle.lane_index
+        if not lane_index:
+            return None, None
+        lane: StraightLane = self.lane_network.lanes[lane_index]
+        s = lane.local_coordinates(ego_vehicle.position)
+        s_front = s_rear = None # front and rear vehicle distances
+        v_front = v_rear = None # speed of the front and rear vehicle
+        
+        for v in self.vehicles + self.objects:
+            if v is not ego_vehicle and not isinstance(v, CorridorObject):
+                s_v, lat_v = lane.local_coordinates(v.position)
+                if not lane.on_lane(v.position, s_v, lat_v, margin=1):
+                    continue
+                if s <= s_v and (s_front is None or s_v <= s_front):
+                    s_front = s_v
+                    v_front = v
+                if s_v < s and (s_rear is None or s_v > s_rear):
+                    s_rear = s_v
+                    v_rear = v
+                    
+        return v_front, v_rear
+        
+    def __repr__(self):
+        return self.vehicles.__repr__()

@@ -3,9 +3,9 @@ from typing import TYPE_CHECKING, Optional, Sequence, Tuple
 
 import numpy as np
 from uam_env.utils import Vector
-
+from uam_env.corridor.lane import StraightLane
 if TYPE_CHECKING:
-    from uam_env.corridor.corridor import Corridor 
+    from uam_env.corridor.corridor import Corridor
 
 # from highway_env import utils
 
@@ -34,8 +34,15 @@ class CorridorObject(ABC):
         self.pitch_dg = pitch_dg
         self.yaw_dg = yaw_dg
         self.speed = speed
-    
         self.attitudes_in_rad()
+    
+    @property
+    def direction(self) -> np.ndarray:
+        return np.array([np.cos(self.heading), np.sin(self.heading), 0])
+
+    @property
+    def velocity(self) -> np.ndarray:
+        return self.speed * self.direction
     
     def attitudes_in_rad(self) -> None:
         self.roll_rad = np.deg2rad(self.roll_dg)
@@ -44,5 +51,31 @@ class CorridorObject(ABC):
         
     def get_position(self) -> Vector:
         return self.position
+    
+    def lane_distance_to(
+        self, other:"CorridorObject", 
+        lane:StraightLane) -> float:
+        """
+        Compute the signed distance to another object along the lane
+        
+        :param other: the other object
+        :param lane: the lane
+        :return: the distance to the other object [m]
+        """
+        if not other:
+            return np.nan
+        if not lane:
+            lane = self.lane 
+            
+        distance = (lane.local_coordinates(other.position)[0] -
+                    lane.local_coordinates(self.position)[0])
+        return distance
+    
+    def __str__(self):
+        return f"{self.__class__.__name__} #{id(self) % 1000}: at {self.position}"
+
+    def __repr__(self):
+        return self.__str__()
+
     
     

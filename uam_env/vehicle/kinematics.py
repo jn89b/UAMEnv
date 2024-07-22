@@ -19,6 +19,7 @@ class Vehicle(CorridorObject):
     A moving vehicle in the environment 
     This vehicle represents the kinematics of a non-holonomic fixed-wing aircraft
     """
+    target_speed:float 
     LENGTH_m = kinematics_config.LENGTH_m #Length of the vehicle in meters
     WIDTH_m = kinematics_config.WIDTH_m  #width of the vehicle in meters 
     MAX_SPEED_MS = kinematics_config.MAX_SPEED_MS #Maximum speed of the vehicle in m/s
@@ -32,12 +33,13 @@ class Vehicle(CorridorObject):
                  pitch_dg:float = 0,
                  heading_dg:float = 0,
                  speed:float = 15) -> None:
-        self.corridor = corridor
+        self.corridor:Corridor = corridor
         self.position = position
         self.heading = heading_dg
         self.pitch_dg = pitch_dg
         self.roll_dg = roll_dg
         self.speed = speed
+        self.target_speed = speed
                 
         # this is for 
         self.action = None
@@ -106,6 +108,8 @@ class Vehicle(CorridorObject):
                       position=position, 
                       speed=speed,
                       heading_dg=np.rad2deg(lane_heading))
+        vehicle.lane_index = lane_id
+        vehicle.lane = lane
         
         return vehicle 
     
@@ -114,6 +118,14 @@ class Vehicle(CorridorObject):
         Step the vehicle dynamics by dt seconds
         """
         pass
+    
+    def on_state_update(self) -> None:
+        if self.corridor:
+            lane_index, lane = self.corridor.lane_network.get_closest_lane(
+                self.position, self.heading
+            )
+            self.lane_index = lane_index
+            self.lane = lane
 
 class DataHandler():
     def __init__(self) -> None:
