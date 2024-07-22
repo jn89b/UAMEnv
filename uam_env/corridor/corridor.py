@@ -313,6 +313,7 @@ class Corridor(object):
                  corridor_objects:List[CorridorObject] = None,
                  np_random: np.random.RandomState = None,
                  record_history:bool = None) -> None:
+        
         if lane_network == None:
             self.lane_network = LaneNetwork()
             self.lane_network.straight_lanes()

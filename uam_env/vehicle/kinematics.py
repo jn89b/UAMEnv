@@ -18,7 +18,6 @@ class Vehicle(CorridorObject):
     """
     A moving vehicle in the environment 
     This vehicle represents the kinematics of a non-holonomic fixed-wing aircraft
-    TODO: Refer to https://en.wikipedia.org/wiki/Intelligent_driver_model
     """
     LENGTH_m = kinematics_config.LENGTH_m #Length of the vehicle in meters
     WIDTH_m = kinematics_config.WIDTH_m  #width of the vehicle in meters 
@@ -42,7 +41,8 @@ class Vehicle(CorridorObject):
                 
         # this is for 
         self.action = None
-        self.crashed = False
+        #flag to indicate if the vehicle has crashed
+        self.crashed = False 
         self.impact = None
         self.log = []
         self.history = deque(maxlen=self.HISTORY_SIZE)
@@ -108,6 +108,12 @@ class Vehicle(CorridorObject):
                       heading_dg=np.rad2deg(lane_heading))
         
         return vehicle 
+    
+    def step(self, dt:float) -> None:
+        """
+        Step the vehicle dynamics by dt seconds
+        """
+        pass
 
 class DataHandler():
     def __init__(self) -> None:
