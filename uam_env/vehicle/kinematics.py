@@ -48,6 +48,15 @@ class Vehicle(CorridorObject):
         self.impact = None
         self.log = []
         self.history = deque(maxlen=self.HISTORY_SIZE)
+        self.plane = Plane()
+        self.plane.set_state_space()
+        state_info = np.array([position[0], 
+                               position[1], 
+                               position[2],
+                               np.deg2rad(roll_dg), 
+                               np.deg2rad(pitch_dg), 
+                               np.deg2rad(heading_dg), speed])
+        self.plane.set_info(state_info)
 
     @classmethod
     def create_random(
@@ -113,13 +122,36 @@ class Vehicle(CorridorObject):
         
         return vehicle 
     
-    def step(self, dt:float) -> None:
-        """
-        Step the vehicle dynamics by dt seconds
-        """
+    def clip_actions(self) -> None:
         pass
     
+    def step(self, dt:float) -> None:
+        """
+        Propagate the vehicle state given the current action
+        
+        :param dt: timestep 
+        """
+        self.clip_actions()
+        acceleration = self.action['acceleration']
+        #set the acceleration 
+        speed_input = self.plane.state_info[6] + acceleration * dt
+        #make sure the speed is within the limits
+        speed_input = np.clip(speed_input, 
+                              self.MIN_SPEED_MS, 
+                              self.MAX_SPEED_MS)
+        
+        action = np.array([self.action['roll'],
+                            self.action['pitch'],
+                            self.action['yaw'],
+                            speed_input])
+        
+        new_states = self.plane.rk45(
+            self.plane.state_info, action, dt)
+        self.on_state_update()
+        self.plane.set_info(new_states)
+    
     def on_state_update(self) -> None:
+        
         if self.corridor:
             lane_index, lane = self.corridor.lane_network.get_closest_lane(
                 self.position, self.heading

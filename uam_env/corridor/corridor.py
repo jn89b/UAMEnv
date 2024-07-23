@@ -325,6 +325,22 @@ class Corridor(object):
         self.np_random = np_random if np_random else np.random.RandomState()
         self.record_history = record_history
     
+    def act(self) -> None:
+        """
+        Act on the corridor
+        """
+        for vehicle in self.vehicles:
+            vehicle.act()
+            
+    def step(self, dt:float) -> None:
+        """
+        Step the dynamics of each entity in the corridor
+        """
+        for vehicle in self.vehicles:
+            vehicle.step(dt)
+        
+        #TODO: handle collisions between vehicles
+
     def neighbor_vehicles(self, ego_vehicle:"Vehicle",
                           lane_index:str) -> Tuple[Optional["Vehicle"], Optional["Vehicle"]]:
         """

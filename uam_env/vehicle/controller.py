@@ -67,7 +67,7 @@ class Controller():
         
         roll_rate_command = (roll - ego_roll_rad) / self.TAU_ROLL
         
-        return (heading_rate_command, roll_rate_command)
+        return (heading_ref, heading_rate_command, roll, roll_rate_command)
     
     def pitch_control(self, target_lane:StraightLane, 
                              ego_vehicle:Vehicle) -> Tuple[float, float]:

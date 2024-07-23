@@ -234,6 +234,16 @@ class IDMVehicle(Vehicle):
             )
         return acceleration
 
+    def step(self, dt:float) -> None:
+        """
+        Step the simulation.
+        
+        Increases the timer and step the vehicle. 
+        
+        :param dt: timestep
+        """
+        self.timer += dt
+        super().step(dt)
 
     def act(self, action: Union[dict,str]=None) -> None:
         """
@@ -247,13 +257,17 @@ class IDMVehicle(Vehicle):
         # corridor: Corridor = self.corridor
         self.follow_corridor()
         action = {
+            'roll_cmd': None,
+            'pitch_cmd': None,
+            'yaw_cmd': None,
             'roll_rate_cmd': None,
             'pitch_rate_cmd': None,
             'heading_rate_cmd': None,
-            'speed_cmd': None
+            'acceleration': None,
         }
         # Lateral Control
-        heading_rate_cmd, roll_rate_cmd = self.controller.steering_control(
+        heading_ref, heading_rate_cmd, roll_ref, roll_rate_cmd = \
+            self.controller.steering_control(
             target_lane=self.corridor.lanes[self.target_lane],
             ego_position=self.position,
             ego_speed=self.speed,
@@ -270,7 +284,7 @@ class IDMVehicle(Vehicle):
             ego_vehicle=self, 
             lane_id=self.lane_index)
         
-        acceleration = self.acceleration(
+        action["acceleration"] = self.acceleration(
             ego_vehicle=self, 
             front_vehicle=front_vehicle, 
             rear_vehicle=rear_vehicle)
@@ -286,10 +300,16 @@ class IDMVehicle(Vehicle):
             action["acceleration"] = min(
                 action["acceleration"], target_idm_acceleration
             )
-        # action['acceleration'] = self.recover_from_stop(action['acceleration'])
         action["acceleration"] = np.clip(
             action["acceleration"], -self.ACC_MAX, self.ACC_MAX
         )
+        
+        action["roll_cmd"] = roll_ref
+        action["pitch_cmd"] = pitch_command
+        action["yaw_cmd"] = heading_ref
+        action["roll_rate_cmd"] = roll_rate_cmd
+        action["pitch_rate_cmd"] = pitch_rate_cmd
+        action["heading_rate_cmd"] = heading_rate_cmd
         
         Vehicle.act(
             self, action
