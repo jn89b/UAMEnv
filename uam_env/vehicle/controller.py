@@ -28,7 +28,7 @@ class Controller():
                          ego_position:Vector,
                          ego_speed:float,
                          ego_heading_rad:float,
-                         ego_roll_rad:float) -> Tuple[float, float]:
+                         ego_roll_rad:float) -> Tuple[float, float, float, float]:
         """
         Steer the vehicle to the target lane 
         
@@ -70,14 +70,14 @@ class Controller():
         return (heading_rate_command, roll_rate_command)
     
     def pitch_control(self, target_lane:StraightLane, 
-                             ego_vehicle:Vehicle) -> float:
+                             ego_vehicle:Vehicle) -> Tuple[float, float]:
         lane_coords = target_lane.local_coordinates(ego_vehicle.position)
         desired_altitude = lane_coords[2] - ego_vehicle.position[2]
         
         pitch_command = self.KP_PHI * (desired_altitude - ego_vehicle.pitch_rad)
         pitch_rate = (pitch_command - ego_vehicle.pitch_rad) / self.TAU_ACC
         
-        return pitch_rate
+        return (pitch_rate, pitch_command)
         
     
     def acceleration_control(self, ego_vehicle:Vehicle,

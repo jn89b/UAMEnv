@@ -127,6 +127,13 @@ class Vehicle(CorridorObject):
             self.lane_index = lane_index
             self.lane = lane
 
+    def act(self, action:Union[dict, str]) -> None:
+        """
+        Set the vehicle's action
+        """
+        if action:
+            self.action = action
+
 class DataHandler():
     def __init__(self) -> None:
         self.x = []

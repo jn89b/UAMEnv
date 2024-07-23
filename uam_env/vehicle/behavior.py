@@ -24,6 +24,12 @@ class IDMVehicle(Vehicle):
     TIME_WANTED = kinematics_config.TIME_WANTED # seconds
     
     DELTA = 4.0 # exponent for the velocity term
+
+    POLITENESS = 0.3 # coefficient for politeness [0, 1]
+    
+    LANE_CHANGE_MIN_ACC_GAIN = 0.2 # m/s^2
+    
+    LANE_CHANGE_MAX_BRAKING_IMPOSED = 2.0 # m/s^2
     
     def __init__(
         self,
@@ -128,23 +134,63 @@ class IDMVehicle(Vehicle):
             return 
 
         # # else, at a given frequency,
-        # if not utils.do_every(self.LANE_CHANGE_DELAY, self.timer):
-        #     return
-        # self.timer = 0
+        if not utils.do_every(self.LANE_CHANGE_DELAY, self.timer):
+            return
+        self.timer = 0
 
-        # # decide to make a lane change
-        # for lane_index in self.road.network.side_lanes(self.lane_index):
-        #     # Is the candidate lane close enough?
-        #     if not self.road.network.get_lane(lane_index).is_reachable_from(
-        #         self.position
-        #     ):
-        #         continue
-        #     # Only change lane when the vehicle is moving
-        #     if np.abs(self.speed) < 1:
-        #         continue
-        #     # Does the MOBIL model recommend a lane change?
-        #     if self.mobil(lane_index):
-        #         self.target_lane_index = lane_index
+        if self.mobil(self, self.target_lane_index):
+            self.target_lane_index = self.target_lane_index
+            
+    def mobil(self, ego_vehicle:Vehicle,
+              lane_index: str) -> bool:
+        """
+        MOBIL lane change model: Minimizing Overall Braking Induced by a Lane change
+
+            The vehicle should change lane only if:
+            - after changing it (and/or following vehicles) can accelerate more;
+            - it doesn't impose an unsafe braking on its new following vehicle.
+
+        :param lane_index: the candidate lane for the change
+        :return: whether the lane change should be performed
+        """
+        # is the maneuver unsafe for the new following vehicle?
+        new_preceding, new_following = self.corridor.neighbor_vehicles(self, lane_index)
+        new_following_a = self.acceleration(
+            ego_vehicle=new_following, front_vehicle=new_preceding
+        )
+        new_following_pred_a = self.acceleration(
+            ego_vehicle=new_following, front_vehicle=self
+        )
+        if new_following_pred_a < -self.LANE_CHANGE_MAX_BRAKING_IMPOSED:
+            return False
+
+        # Do I have a planned route for a specific lane which is safe for me to access?
+        old_preceding, old_following = self.corridor.neighbour_vehicles(self)
+        self_pred_a = self.acceleration(ego_vehicle=self, front_vehicle=new_preceding)
+    
+        self_a = self.acceleration(ego_vehicle=self, front_vehicle=old_preceding)
+        old_following_a = self.acceleration(
+            ego_vehicle=old_following, front_vehicle=self
+        )
+        old_following_pred_a = self.acceleration(
+            ego_vehicle=old_following, front_vehicle=old_preceding
+        )
+        jerk = (
+            self_pred_a
+            - self_a
+            + self.POLITENESS
+            * (
+                new_following_pred_a
+                - new_following_a
+                + old_following_pred_a
+                - old_following_a
+            )
+        )
+        if jerk < self.LANE_CHANGE_MIN_ACC_GAIN:
+            return False
+
+        # All clear, let's go!
+        return True
 
     def acceleration(
         self, 
@@ -215,7 +261,7 @@ class IDMVehicle(Vehicle):
             ego_roll_rad=self.roll
         )
         
-        pitch_rate_cmd = self.controller.pitch_control(
+        pitch_rate_cmd, pitch_command = self.controller.pitch_control(
             target_lane=self.corridor.lanes[self.target_lane],
             vehicle = self,
         )
@@ -224,12 +270,27 @@ class IDMVehicle(Vehicle):
             ego_vehicle=self, 
             lane_id=self.lane_index)
         
-        acceleration_cmd = self.acceleration(
+        acceleration = self.acceleration(
             ego_vehicle=self, 
             front_vehicle=front_vehicle, 
             rear_vehicle=rear_vehicle)
         
+        # When changing lane, check both current and target lanes
+        if self.lane_index != self.target_lane_index:
+            front_vehicle, rear_vehicle = self.corridor.neighbor_vehicles(
+                self, self.target_lane_index
+            )
+            target_idm_acceleration = self.acceleration(
+                ego_vehicle=self, front_vehicle=front_vehicle, rear_vehicle=rear_vehicle
+            )
+            action["acceleration"] = min(
+                action["acceleration"], target_idm_acceleration
+            )
+        # action['acceleration'] = self.recover_from_stop(action['acceleration'])
+        action["acceleration"] = np.clip(
+            action["acceleration"], -self.ACC_MAX, self.ACC_MAX
+        )
         
-                            
-        
-        
+        Vehicle.act(
+            self, action
+        )  # Skip ControlledVehicle.act(), or the command will be overriden.
