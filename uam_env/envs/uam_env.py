@@ -1,7 +1,10 @@
 from typing import Dict, Text
 from uam_env.corridor.corridor import Corridor
 from uam_env.vehicle.kinematics import Vehicle
+from uam_env.vehicle.behavior import IDMVehicle
 from uam_env.config import kinematics_config
+from typing import Dict, List, Optional, Text, Tuple, TypeVar
+
 
 import numpy as np
 import gymnasium as gym
@@ -27,11 +30,17 @@ For UAM from our literature review, we need to consider the following:
 
 class UAMEnv(gym.Env):
     """
-    
+    This is the main environment for the UAM
     """
     def __init__(self) -> None:
         # super().__init__()
         self.config = self.default_config()
+        self.dt = 0.1
+        
+        #Running variables
+        self.time = 0 #simulation time 
+        self.steps = 0 
+        self.done = False
     
     @classmethod
     def default_config(cls) -> dict:
@@ -41,7 +50,7 @@ class UAMEnv(gym.Env):
         config.update({
             "n_vehicles": 10,
             "n_corridors": 1,
-            "non_controlled_vehicles": 3,
+            "non_controlled_vehicles": 1,
             "controlled_vehicles": 1,
             "lane_network": None,
             "record_history": True,
@@ -68,7 +77,7 @@ class UAMEnv(gym.Env):
             record_history=self.config["record_history"]
         )
         
-    def _reset(self) -> None:
+    def reset(self) -> None:
         """
         Reset the environment
         """
@@ -87,9 +96,11 @@ class UAMEnv(gym.Env):
                 kinematics_config.MIN_SPEED_MS,
                 kinematics_config.MAX_SPEED_MS
             )
-            vehicle = Vehicle.create_random(
+            
+            vehicle = IDMVehicle.create_random(
                 corridor=self.corridors,
                 speed=random_speed,
+                lane_from=self.config["initial_lane_id"],
                 lane_id=self.config["initial_lane_id"],
                 spacing=self.config["ego_spacing"]                
             )
@@ -100,6 +111,16 @@ class UAMEnv(gym.Env):
         self.corridors.vehicles = other_vehicles
         # overall_vehicles = self.controlled_vehicles + other_vehicles    
         # self.corridors.vehicles = overall_vehicles
+        
+    def simulate(self, action=None) -> None:
+        """
+        Simulate the environment
+        """
+        self.corridors.act()
+        self.corridors.step(self.dt)
+        self.steps += 1
+    
+        
         
     
     

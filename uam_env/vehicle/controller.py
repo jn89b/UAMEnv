@@ -17,12 +17,14 @@ class Controller():
     TAU_PURSUIT = controller_config.TAU_PURSUIT
     TAU_ROLL = 0.5
     
-    KP_HEADING = 1 / TAU_HEADING
+    KP_HEADING = controller_config.KP_HEADING
+    KD_HEADING = controller_config.KD_HEADING
+    KP_ROLL = 0.1
     KP_LATERAL = 1 / TAU_LATERAL
     KP_PHI = 1 / TAU_PURSUIT
     
     def __init__(self) -> None:
-        pass
+        self.old_heading_error = 0.0
     
     def steering_control(self, target_lane:StraightLane,
                          ego_position:Vector,
@@ -42,44 +44,52 @@ class Controller():
         :param target_lane_index: index of the lane to follow
         :return: a steering wheel angle command [rad]
         """
-        lane_coords = target_lane.local_coordinates(ego_position)
-        lane_next_coords = lane_coords[0] + ego_speed * self.TAU_PURSUIT
+        long, lat = target_lane.local_coordinates(ego_position)
+        lane_next_coords = long + (ego_speed * self.TAU_PURSUIT)
         lane_future_heading = target_lane.heading_at(lane_next_coords)
-        
         #lateral position control
-        lateral_speed_command = -self.KP_LATERAL * lane_coords[1]
+        lateral_speed_command = -self.KP_LATERAL * lat
         #lateral speed to heading reference
-        heading_ref = np.arcsin(
-            np.clip(lateral_speed_command / utils.not_zero(ego_speed), -1, 1)
-        )
+        dx = lane_next_coords - long
+        dy = lateral_speed_command
+        heading_command = np.arctan2(dy, dx)     
+        heading_ref = lane_future_heading + np.clip(heading_command,
+                    -np.pi/4, np.pi/4)
+        #heading control
         heading_error = utils.wrap_to_pi(heading_ref - ego_heading_rad)
-
-        heading_rate_command = self.KP_HEADING * heading_error
+        P_heading = self.KP_HEADING * heading_error
+        D_heading = self.KD_HEADING * (heading_error - self.old_heading_error)/0.1
+        heading_gain = P_heading + D_heading
+        heading_rate_command = self.KP_ROLL * heading_error
         roll_desired = np.arctan2(heading_rate_command * ego_speed, 9.81)
+        
+        if abs(heading_error) <= np.deg2rad(1):
+            roll_desired = 0.0
+            heading_gain = 0.0
+        
         #make sure not nan
         if np.isnan(roll_desired):
             roll_desired = 0.0
-
+        
         #check if the desired roll is within the limits
         roll = np.clip(roll_desired, 
                        -controller_config.ROLL_MAX, 
                        controller_config.ROLL_MAX)
-        
         roll_rate_command = (roll - ego_roll_rad) / self.TAU_ROLL
+        self.old_heading_error = heading_error
         
-        return (heading_ref, heading_rate_command, roll, roll_rate_command)
+        return (heading_gain, heading_rate_command, roll, roll_rate_command)
     
     def pitch_control(self, target_lane:StraightLane, 
                              ego_vehicle:Vehicle) -> Tuple[float, float]:
         lane_coords = target_lane.local_coordinates(ego_vehicle.position)
-        desired_altitude = lane_coords[2] - ego_vehicle.position[2]
+        target_lane_z = target_lane.start[2]
+        desired_altitude = target_lane_z - ego_vehicle.position[2]
         
-        pitch_command = self.KP_PHI * (desired_altitude - ego_vehicle.pitch_rad)
-        pitch_rate = (pitch_command - ego_vehicle.pitch_rad) / self.TAU_ACC
+        current_pitch_rad = np.deg2rad(ego_vehicle.pitch_dg)
+        pitch_command = self.KP_PHI * (desired_altitude - current_pitch_rad)
+        pitch_rate = (pitch_command - current_pitch_rad) / self.TAU_ACC
         
         return (pitch_rate, pitch_command)
         
     
-    def acceleration_control(self, ego_vehicle:Vehicle,
-                             front_vehicle:Vehicle, rear_vehicle:Vehicle) -> float:
-        pass

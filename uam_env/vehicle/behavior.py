@@ -19,7 +19,7 @@ class IDMVehicle(Vehicle):
     COMFORT_ACC_MIN = kinematics_config.COMFORT_ACC_MIN # m/s^2
     
     DISTANCE_WANTED = kinematics_config.BUFFER_SPACING_M + \
-        kinematics_config.LENGTH_M
+        kinematics_config.LENGTH_m # meters
         
     TIME_WANTED = kinematics_config.TIME_WANTED # seconds
     
@@ -52,7 +52,11 @@ class IDMVehicle(Vehicle):
         )
 
         self.target_lane = target_lane
-        self.timer = timer
+        if timer is None:
+            self.timer = 0
+            
+        self.enable_lane_change = True
+        
         if controller is None:
             self.controller = Controller()
         else:
@@ -70,7 +74,6 @@ class IDMVehicle(Vehicle):
             pitch_dg=vehicle.pitch_dg,
             heading_dg=vehicle.heading_dg,
             speed=vehicle.speed,
-            vehicle=vehicle.target_lane,
             timer=getattr(vehicle, "timer", None)
         )
     
@@ -119,7 +122,7 @@ class IDMVehicle(Vehicle):
         - MOBIL model
         """
         if self.lane_index != self.target_lane:
-            for v in self.road.vehicles:
+            for v in self.corridor.vehicles:
                 if ( v is not self 
                     and v.lane_index != self.target_lane_index
                     and isinstance(v, IDMVehicle) 
@@ -154,7 +157,8 @@ class IDMVehicle(Vehicle):
         :return: whether the lane change should be performed
         """
         # is the maneuver unsafe for the new following vehicle?
-        new_preceding, new_following = self.corridor.neighbor_vehicles(self, lane_index)
+        new_preceding, new_following = self.corridor.neighbor_vehicles(
+            self, lane_index)
         new_following_a = self.acceleration(
             ego_vehicle=new_following, front_vehicle=new_preceding
         )
@@ -166,9 +170,11 @@ class IDMVehicle(Vehicle):
 
         # Do I have a planned route for a specific lane which is safe for me to access?
         old_preceding, old_following = self.corridor.neighbour_vehicles(self)
-        self_pred_a = self.acceleration(ego_vehicle=self, front_vehicle=new_preceding)
+        self_pred_a = self.acceleration(
+            ego_vehicle=self, front_vehicle=new_preceding)
     
-        self_a = self.acceleration(ego_vehicle=self, front_vehicle=old_preceding)
+        self_a = self.acceleration(
+            ego_vehicle=self, front_vehicle=old_preceding)
         old_following_a = self.acceleration(
             ego_vehicle=old_following, front_vehicle=self
         )
@@ -254,8 +260,11 @@ class IDMVehicle(Vehicle):
         """
         if self.crashed:
             return
-        # corridor: Corridor = self.corridor
+        
         self.follow_corridor()
+        if self.enable_lane_change:
+            self.change_lane_policy()
+            
         action = {
             'roll_cmd': None,
             'pitch_cmd': None,
@@ -265,24 +274,27 @@ class IDMVehicle(Vehicle):
             'heading_rate_cmd': None,
             'acceleration': None,
         }
+                
+        target_lane = self.corridor.lane_network.lanes[self.target_lane_index]
+
         # Lateral Control
         heading_ref, heading_rate_cmd, roll_ref, roll_rate_cmd = \
             self.controller.steering_control(
-            target_lane=self.corridor.lanes[self.target_lane],
+            target_lane=target_lane,
             ego_position=self.position,
             ego_speed=self.speed,
-            ego_heading_rad=self.heading,
-            ego_roll_rad=self.roll
+            ego_heading_rad=np.deg2rad(self.heading),
+            ego_roll_rad=np.deg2rad(self.roll_dg)
         )
         
         pitch_rate_cmd, pitch_command = self.controller.pitch_control(
-            target_lane=self.corridor.lanes[self.target_lane],
-            vehicle = self,
+            target_lane=target_lane,
+            ego_vehicle = self,
         )
         # Longitudinal Control
         front_vehicle, rear_vehicle = self.corridor.neighbor_vehicles(
             ego_vehicle=self, 
-            lane_id=self.lane_index)
+            lane_index=self.lane_index)
         
         action["acceleration"] = self.acceleration(
             ego_vehicle=self, 
@@ -304,13 +316,16 @@ class IDMVehicle(Vehicle):
             action["acceleration"], -self.ACC_MAX, self.ACC_MAX
         )
         
+        #action["roll_cmd"] = roll_ref
         action["roll_cmd"] = roll_ref
         action["pitch_cmd"] = pitch_command
         action["yaw_cmd"] = heading_ref
+        #this will continously change the heading of the vehicle
+        #current vehicle heading
         action["roll_rate_cmd"] = roll_rate_cmd
         action["pitch_rate_cmd"] = pitch_rate_cmd
         action["heading_rate_cmd"] = heading_rate_cmd
-        
+    
         Vehicle.act(
             self, action
         )  # Skip ControlledVehicle.act(), or the command will be overriden.

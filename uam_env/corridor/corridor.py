@@ -23,7 +23,7 @@ class StraightLane(object):
     A straight lane in the corridor
     TODO: Add vertical and lateral boundaries to the lane from the centerline 
     """
-    speed_limit = lane_config.SPEED_LIMIT_MPS
+    speed_limit = lane_config.SPEED_LIMIT_MS
     def __init__(self,
                  start:Vector,
                  end:Vector,
@@ -39,8 +39,8 @@ class StraightLane(object):
                                            self.direction[0], 
                                            0])
         
-        self.heading_rad = np.arctan2(self.start[1] - self.end[1], 
-                                  self.start[0] - self.end[0])
+        self.heading_rad = np.arctan2(self.end[1] - self.start[1], 
+                                  self.end[0] - self.start[0])
         self.init_boundaries()
         
     
@@ -106,6 +106,7 @@ class StraightLane(object):
     def local_coordinates(self, position:Vector) -> Tuple[float, float]:
         """
         Get the local coordinates of the vehicle in the lane
+        Returns the longitudinal and lateral coordinates of the vehicle
         """
         delta = position - self.start
         longitudinal = np.dot(delta, self.direction)
@@ -283,7 +284,7 @@ class LaneNetwork(object):
         self, 
         num_lanes:int = 4,
         start_vector_m:Vector=np.array([0, 0, 50]),
-        length_m:float = 1000,
+        length_m:float = lane_config.LANE_LENGTH_M,
         heading_dg:float = 0) -> Tuple:
         """
         Create straight lanes in the corridor
@@ -306,7 +307,9 @@ class Corridor(object):
     TODO: Add more objects to the corridor?
     
     Keep track of which vehicles are in the corridor
-    
+    This is like a board game where the 
+    agent can move through the lanes keeps track of the state of 
+    the environment
     """
     def __init__(self,
                  lane_network:LaneNetwork = None,

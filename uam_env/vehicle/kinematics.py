@@ -89,13 +89,15 @@ class Vehicle(CorridorObject):
         lane_names = list(corridor.lane_network.lanes.keys())
         _from = lane_from or random.choice(lane_names)
         _to = lane_to or random.choice(lane_names)
+        _from = "lateral"
+        _to ="lateral_passing"
         _id = _from
         lane = corridor.lane_network.lanes[_from]
         if speed is None:
             speed = np.random.uniform(
                 cls.MIN_SPEED_MS, 
                 cls.MAX_SPEED_MS)
-
+        print("going from ", _from, " to ", _to)
         default_spacing = kinematics_config.BUFFER_SPACING_M \
             + (1 * speed)
             
@@ -117,9 +119,9 @@ class Vehicle(CorridorObject):
                       position=position, 
                       speed=speed,
                       heading_dg=np.rad2deg(lane_heading))
-        vehicle.lane_index = lane_id
+        vehicle.lane_index = _from
         vehicle.lane = lane
-        
+        vehicle.target_lane_index = _to
         return vehicle 
     
     def clip_actions(self) -> None:
@@ -133,16 +135,18 @@ class Vehicle(CorridorObject):
         """
         self.clip_actions()
         acceleration = self.action['acceleration']
+        yaw_input = self.action['yaw_cmd']
         #set the acceleration 
         speed_input = self.plane.state_info[6] + acceleration * dt
         #make sure the speed is within the limits
         speed_input = np.clip(speed_input, 
                               self.MIN_SPEED_MS, 
                               self.MAX_SPEED_MS)
-        
-        action = np.array([self.action['roll'],
-                            self.action['pitch'],
-                            self.action['yaw'],
+        # yaw_cmd = np.clip(yaw_input, np.deg2rad(-15), np.deg2rad(15))
+        yaw_cmd = yaw_input
+        action = np.array([self.action['roll_cmd'],
+                            self.action['pitch_cmd'],
+                            yaw_cmd,
                             speed_input])
         
         new_states = self.plane.rk45(
@@ -152,6 +156,21 @@ class Vehicle(CorridorObject):
     
     def on_state_update(self) -> None:
         
+        states = self.plane.get_info()
+        self.position = np.array([states[0], states[1], states[2]])
+        self.roll_dg = np.rad2deg(states[3])
+        self.pitch_dg = np.rad2deg(states[4])
+        
+        #wrap the heading from -pi to pi
+        if states[5] > np.pi:
+            states[5] -= 2*np.pi
+        elif states[5] < -np.pi:
+            states[5] += 2*np.pi
+            
+        self.heading = np.rad2deg(states[5])
+        self.speed = states[6]
+        self.history.append(copy.deepcopy(self.plane.get_info()))
+        
         if self.corridor:
             lane_index, lane = self.corridor.lane_network.get_closest_lane(
                 self.position, self.heading
@@ -159,7 +178,7 @@ class Vehicle(CorridorObject):
             self.lane_index = lane_index
             self.lane = lane
 
-    def act(self, action:Union[dict, str]) -> None:
+    def act(self, action:Union[dict, str]=None) -> None:
         """
         Set the vehicle's action
         """
