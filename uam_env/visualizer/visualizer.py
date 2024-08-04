@@ -148,7 +148,11 @@ class Visualizer(object):
             if show_crash and vehicle.crashed == False:
                 continue 
             data = vehicle.plane.data_handler
-            color = np.random.rand(3,)
+            # color = np.random.rand(3,)
+            if vehicle.agent:
+                color = 'blue'
+            else:
+                color = 'red'
             
             # Initialize a line and a scatter plot
             line, = self.ax.plot([], [], [], label=f"Vehicle {i}", color=color,

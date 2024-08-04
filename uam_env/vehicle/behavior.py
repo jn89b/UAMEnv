@@ -2,11 +2,13 @@ import numpy as np
 from typing import List, Optional, Tuple, Union
 
 from uam_env import utils
-from uam_env.config import kinematics_config
+from uam_env.config import kinematics_config, env_config
 from uam_env.corridor.corridor import Corridor, CorridorObject, StraightLane
 from uam_env.vehicle.kinematics import Vehicle
 from uam_env.utils import Vector
 from uam_env.vehicle.controller import Controller
+
+
 
 class IDMVehicle(Vehicle):
     """
@@ -52,6 +54,7 @@ class IDMVehicle(Vehicle):
         )
 
         self.target_lane = target_lane
+        self.agent = False
         if timer is None:
             self.timer = 0
             
@@ -351,3 +354,129 @@ class IDMVehicle(Vehicle):
         Vehicle.act(
             self, action
         )  # Skip ControlledVehicle.act(), or the command will be overriden.
+
+
+class DiscreteVehicle(IDMVehicle):
+    """
+    Conducts high level decision making for a vehicle.
+    - Observation: the vehicle's current lane and its neighbors
+    - Discrete action space:
+        - 0: lateral lane speed up 
+        - 1: lateral lane slow down
+        - 2: lateral lane keep speed
+        - 3: lateral passing speed up
+        - 4: lateral passing slow down
+        - 5: lateral passing keep speed
+        - 6: vertical lane speed up
+        - 7: vertical lane slow down
+        - 8: vertical lane keep speed 
+    - Continous Observations:
+        - Current states 
+        - Other vehicle relative positions and speeds
+    - Reward:
+        - Not crashing into other vehicles
+        - Reach goal destination in shortest time 
+        - Stay in the vertical and lateral passing zones
+    """
+    DISCRETE_ACTION_MAPPING = env_config.DISCRETE_ACTION_MAPPING
+    LANE_INDEX_MAPPING = env_config.LANE_INDEX_MAPPING
+    def __init__(self, 
+                 corridor: Corridor, 
+                 position: np.ndarray, 
+                 roll_dg: float = 0, 
+                 pitch_dg: float = 0, 
+                 heading_dg: float = 0, 
+                 speed: float = 15, 
+                 target_lane: str = None, 
+                 timer: float = None, 
+                 controller: Controller = None) -> None:
+        super().__init__(corridor, 
+                         position, 
+                         roll_dg, 
+                         pitch_dg, 
+                         heading_dg, 
+                         speed, 
+                         target_lane, 
+                         timer, 
+                         controller)
+        
+        self.agent = True
+        self.change_time_interval = 3
+        
+    def act(self, meta_action:int) -> dict:
+        """
+        Execute an action.
+        
+        For now, no action is supported because the 
+        vehicle makes its own decisions.
+        - Discrete action space:
+            - 0: lateral lane speed up 
+            - 1: lateral lane slow down
+            - 2: lateral lane keep speed
+            - 3: lateral passing speed up
+            - 4: lateral passing slow down
+            - 5: lateral passing keep speed
+            - 6: vertical lane speed up
+            - 7: vertical lane slow down
+            - 8: vertical lane keep speed 
+        
+        Returns a dictionary of actions to be taken by the vehicle
+        
+        """
+        if self.crashed:
+            return
+        
+        action = {
+            'roll_cmd': None,
+            'pitch_cmd': None,
+            'yaw_cmd': None,
+            'roll_rate_cmd': None,
+            'pitch_rate_cmd': None,
+            'heading_rate_cmd': None,
+            'acceleration': None,
+        }
+        if isinstance(meta_action, int):
+            lane_encoding, acceleration = self.DISCRETE_ACTION_MAPPING[meta_action]
+            # Use lane_encoding and acceleration as needed
+        else:
+            raise ValueError(f"Expected action to be an integer, but got {type(action).__name__}")
+        
+        if self.timer // self.change_time_interval == 1 and \
+            self.timer != 0:
+            lane_encoding, acceleration = self.DISCRETE_ACTION_MAPPING[int(meta_action)]
+            target_lane_index = self.LANE_INDEX_MAPPING[lane_encoding]
+            self.target_lane_index = target_lane_index
+        
+        target_lane = self.corridor.lane_network.lanes[self.target_lane_index]
+
+        # Lateral Control
+        heading_ref, heading_rate_cmd, roll_ref, roll_rate_cmd = \
+            self.controller.steering_control(
+            target_lane=target_lane,
+            ego_position=self.position,
+            ego_speed=self.speed,
+            ego_heading_rad=np.deg2rad(self.heading),
+            ego_roll_rad=np.deg2rad(self.roll_dg)
+        )
+        
+        pitch_rate_cmd, pitch_command = self.controller.pitch_control(
+            target_lane=target_lane,
+            ego_vehicle = self,
+        )
+                
+        #action["roll_cmd"] = roll_ref
+        action["roll_cmd"] = roll_ref
+        # I had to add a negative to invert the pitch command
+        action["pitch_cmd"] = -pitch_command
+        action["yaw_cmd"] = heading_ref
+        #this will continously change the heading of the vehicle
+        #current vehicle heading
+        action["roll_rate_cmd"] = roll_rate_cmd
+        # I had to add a negative to invert the pitch command
+        action["pitch_rate_cmd"] = -pitch_rate_cmd
+        action["heading_rate_cmd"] = heading_rate_cmd
+        action["acceleration"] = acceleration
+        
+        Vehicle.act(
+            self, action
+        ) 

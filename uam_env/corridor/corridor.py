@@ -3,9 +3,13 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 from uam_env.utils import Vector
 from uam_env.config import lane_config, kinematics_config
 from uam_env.vehicle.kinematics import Vehicle
+# from uam_env.vehicle.behavior import DiscreteVehicle
 from uam_env.vehicle.objects import CorridorObject
 import numpy as np
 
+if TYPE_CHECKING:
+    from uam_env.corridor.corridor import Corridor
+    from uam_env.vehicle.behavior import DiscreteVehicle
 """
 A corridor consists of a set of lanes that the agent can navigate through
 - To keep it simple a corridor will have the following lanes:
@@ -333,12 +337,19 @@ class Corridor(object):
         self.np_random = np_random if np_random else np.random.RandomState()
         self.record_history = record_history
     
-    def act(self) -> None:
+    #TODO:check typing for vehicles
+    def act(self, action:int=None) -> None:
         """
         Act on the corridor
         """
         for vehicle in self.vehicles:
-            vehicle.act()
+            if vehicle.agent == False:
+                vehicle.act()
+            #TODO: need to consider how I want to change the action 
+            #this will set the discrete action for the vehicle
+            else:
+                vehicle : DiscreteVehicle 
+                vehicle.act(action)
             
     def step(self, dt:float) -> None:
         """

@@ -52,14 +52,14 @@ class Vehicle(CorridorObject):
         self.crashed = False
         self.hit = False
         self.impact = np.zeros(self.position.shape)
-    
-        
+
         self.crashed = False 
         self.impact = None
         self.log = []
         self.history = deque(maxlen=self.HISTORY_SIZE)
         self.plane = Plane()
         self.plane.set_state_space()
+        
         state_info = np.array([position[0], 
                                position[1], 
                                position[2],

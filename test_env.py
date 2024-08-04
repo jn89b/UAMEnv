@@ -7,11 +7,12 @@ import copy
 # Create the environment
 uam_env = UAMEnv()
 uam_env.reset()
-print("uam_env: ", uam_env.corridors)
 
 # Simulate the environment
-for i in range(250):
-    uam_env.simulate()
+for i in range(300):
+    # Take a random action from the action space (discrete action)
+    action = uam_env.action_space.sample()
+    uam_env.simulate(action)
 
 vehicles = uam_env.corridors.vehicles
 #check if crash
@@ -34,5 +35,4 @@ fig, ax = vis.show_lanes_3d(
     show_crash=False)
 vis.animate_vehicles(uam_env=uam_env, show_crash=False)
 
-    
     
