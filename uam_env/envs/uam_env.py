@@ -103,11 +103,11 @@ class UAMEnv(gym.Env):
                 lane_id=self.config["initial_lane_id"],
                 spacing=self.config["ego_spacing"]                
             )
-            
-            other_vehicles.append(vehicle)
+            self.corridors.vehicles.append(vehicle)
+            # other_vehicles.append(vehicle)
         
         #combine the controlled vehicles and other vehicles
-        self.corridors.vehicles = other_vehicles
+        #self.corridors.vehicles = other_vehicles
         # overall_vehicles = self.controlled_vehicles + other_vehicles    
         # self.corridors.vehicles = overall_vehicles
         
@@ -119,7 +119,36 @@ class UAMEnv(gym.Env):
         self.corridors.step(self.dt)
         self.steps += 1
     
+    
+    def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, Dict]:
+        """
+        Perform an action and step the environment dynamics.
+
+        The action is executed by the ego-vehicle, and all other vehicles on the road performs their default behaviour
+        for several simulation timesteps until the next decision making step.
+
+        :param action: the action performed by the ego-vehicle
+        :return: a tuple (observation, reward, terminated, truncated, info)
+        """
         
+        #TODO: Add controled vehicle and test it out
+        if self.corridors is None or self.vehicle is None:
+            raise NotImplementedError(
+                "The corridor and vehicle must be initialized in the environment implementation"
+            )
+
+        self.time += 1 / self.config["policy_frequency"]
+        self.simulate(action)
+
+        # obs = self.observation_type.observe()
+        # reward = self._reward(action)
+        # terminated = self._is_terminated()
+        # truncated = self._is_truncated()
+        # info = self._info(obs, action)
+        if self.render_mode == "human":
+            self.render()
+
+        return obs, reward, terminated, truncated, info
         
     
     

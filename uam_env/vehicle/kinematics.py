@@ -114,25 +114,24 @@ class Vehicle(CorridorObject):
             speed = np.random.uniform(
                 cls.MIN_SPEED_MS, 
                 cls.MAX_SPEED_MS)
-        print("going from ", _from, " to ", _to)
         default_spacing = kinematics_config.BUFFER_SPACING_M \
             + (1 * speed)
-            
+                        
         # position = lane.position(
         #     longitudinal=lane.length_m,
         #     lateral=0
         # )
         offset = spacing*default_spacing
         if len(corridor.vehicles):
-            # x0 = np.max([v.position[0] for v in corridor.vehicles])
-            x0 = np.max([lane.local_coordinates(v.position)[0] for v in corridor.vehicles])
+            x0 = np.max([v.position[0] for v in corridor.vehicles])
+            max_value = np.max([lane.local_coordinates(v.position)[0] for v in corridor.vehicles])
+            x0 = np.random.uniform(max_value, kinematics_config.LENGTH_m)
+            print("x0 chosen", x0)
         else:
-            x0 = 2 * default_spacing     
+            x0 = 3 * default_spacing     
 
-        x0 += offset * corridor.np_random.uniform(0.1, 1.2)
-        print("x0: ", x0)
+        x0 += offset * corridor.np_random.uniform(0.9, 1.5) #+ default_spacing 
         position = lane.position(longitudinal=x0,lateral=0)
-
         lane_heading = lane.heading_at()
         vehicle = cls(corridor=corridor, 
                       position=position, 
