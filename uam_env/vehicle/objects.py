@@ -95,6 +95,7 @@ class CorridorObject(ABC):
         :param other: the other vehicle or object
         :param dt: timestep to check for future collisions (at constant velocity)
         """
+
         if other is self or not (self.check_collisions or other.check_collisions):
             return
         if not (self.collidable and other.collidable):
@@ -118,12 +119,14 @@ class CorridorObject(ABC):
             if not other.solid:
                 other.hit = True
     
+    
     def _is_colliding(self, other, dt):
         # Fast spherical pre-check
         distance = np.linalg.norm(other.position - self.position)
+        # if distance > (self.diagonal + other.diagonal) / 2 + self.speed * dt:
+        #     return False, False, np.zeros(2)
         if distance > (self.diagonal + other.diagonal) / 2 + self.speed * dt:
             return False, False, np.zeros(2)
-        
         else:
             intersection = True
             will_intersect = True

@@ -43,7 +43,8 @@ class Visualizer(object):
     def show_lanes_3d(self, lanes:LaneNetwork,
                       uam_env:UAMEnv=None, 
                       plot_vehicles:bool=False,
-                      zoom_in:bool=True) -> Tuple[plt.Figure, plt.Axes]:
+                      zoom_in:bool=True,
+                      show_crash:bool=False) -> Tuple[plt.Figure, plt.Axes]:
         
         fig, ax = plt.subplots(subplot_kw={'projection': '3d'},
                                figsize=(12, 12))
@@ -93,7 +94,9 @@ class Visualizer(object):
             
             
         if plot_vehicles:
-            self.plot_vehicles(uam_env, ax)
+            self.plot_vehicles(uam_env=uam_env, 
+                               ax=ax, 
+                               show_crash=show_crash)
         
         ax.legend()
         scale = 8
@@ -104,13 +107,16 @@ class Visualizer(object):
         return fig, ax
     
     def plot_vehicles(self, uam_env:UAMEnv, ax=None,
-                      zoom_in:bool=True) -> None:
+                      zoom_in:bool=True,
+                      show_crash:bool=False) -> None:
         min_x = 1000 
         max_x = -1000
         min_y = 1000
         max_y = -1000
         for i, vehicle in enumerate(uam_env.corridors.vehicles):
             data = vehicle.plane.data_handler
+            if show_crash and vehicle.crashed == False:
+                continue 
             #choose a random color
             color = np.random.rand(3,)
             ax.plot(data.x, data.y, data.z, label=f"Vehicle {i}", color=color,
@@ -133,11 +139,14 @@ class Visualizer(object):
         
         return ax
     
-    def animate_vehicles(self, uam_env:UAMEnv) -> None:
+    def animate_vehicles(self, uam_env:UAMEnv,
+                         show_crash:bool=False) -> None:
         self.uam_env = uam_env
         self.fig, self.ax = self.show_lanes_3d(uam_env.corridors.lane_network)
         # Initialize lines and scatter plots for each vehicle
         for i, vehicle in enumerate(uam_env.corridors.vehicles):
+            if show_crash and vehicle.crashed == False:
+                continue 
             data = vehicle.plane.data_handler
             color = np.random.rand(3,)
             
@@ -160,8 +169,8 @@ class Visualizer(object):
                 self.max_y = max(data.y)
 
         # Set the limits of the plot
-        self.ax.set_xlim(self.min_x, self.max_x)
-        self.ax.set_ylim(self.min_y, self.max_y)
+        # self.ax.set_xlim(self.min_x, self.max_x)
+        # self.ax.set_ylim(self.min_y, self.max_y)
         # self.ax.set_zlim(0, max(max(data.z) for vehicle in uam_env.corridors.vehicles))
 
         # Create the animation

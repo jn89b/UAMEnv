@@ -124,13 +124,11 @@ class Vehicle(CorridorObject):
         offset = spacing*default_spacing
         if len(corridor.vehicles):
             x0 = np.max([v.position[0] for v in corridor.vehicles])
-            max_value = np.max([lane.local_coordinates(v.position)[0] for v in corridor.vehicles])
-            x0 = np.random.uniform(max_value, kinematics_config.LENGTH_m)
-            print("x0 chosen", x0)
+            #max_value = np.max([lane.local_coordinates(v.position)[0] for v in corridor.vehicles])
+            #x0 = np.random.uniform(max_value, kinematics_config.LENGTH_m)
         else:
             x0 = 3 * default_spacing     
-
-        x0 += offset * corridor.np_random.uniform(0.9, 1.5) #+ default_spacing 
+        x0 += offset * corridor.np_random.uniform(0.5, 1.2) #+ default_spacing 
         position = lane.position(longitudinal=x0,lateral=0)
         lane_heading = lane.heading_at()
         vehicle = cls(corridor=corridor, 
@@ -155,7 +153,7 @@ class Vehicle(CorridorObject):
         acceleration = self.action['acceleration']
         yaw_input = self.action['yaw_cmd']
         #set the acceleration 
-        speed_input = self.plane.state_info[6] + acceleration * dt
+        speed_input = self.plane.state_info[6] + (acceleration * dt)
         #make sure the speed is within the limits
         speed_input = np.clip(speed_input, 
                               self.MIN_SPEED_MS, 

@@ -126,7 +126,7 @@ class IDMVehicle(Vehicle):
             for v in self.corridor.vehicles:
                 if ( v is not self 
                     and v.lane_index != self.target_lane_index
-                    and isinstance(v, IDMVehicle) 
+                    # and isinstance(v, IDMVehicle) 
                     and v.lane_index == self.lane_index):
                     distance = self.lane_distance_to(v, v.lane)
                     desired_distance = self.desired_gap(self, v)
@@ -221,6 +221,7 @@ class IDMVehicle(Vehicle):
         """
         if not ego_vehicle or not isinstance(ego_vehicle, Vehicle):
             return 0
+        
         ego_target_speed = getattr(ego_vehicle, "target_speed", 0)
         if ego_vehicle.lane and ego_vehicle.lane.speed_limit is not None:
             ego_target_speed = np.clip(
