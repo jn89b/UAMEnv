@@ -10,7 +10,7 @@ from uam_env.config import kinematics_config
 from uam_env.vehicle.objects import CorridorObject
 
 if TYPE_CHECKING:
-    from uam_env.corridor.corridor import Corridor
+    from uam_env.corridor.corridor import Corridor, StraightLane
 
 import numpy as np
 
@@ -44,6 +44,16 @@ class Vehicle(CorridorObject):
         # this is for 
         self.action = None
         #flag to indicate if the vehicle has crashed
+        self.check_collisions = True
+        self.solid = True
+        # Enable collision with other collidables
+        self.collidable = True
+        self.diagonal = np.sqrt(self.LENGTH_m**2 + self.WIDTH_m**2)
+        self.crashed = False
+        self.hit = False
+        self.impact = np.zeros(self.position.shape)
+    
+        
         self.crashed = False 
         self.impact = None
         self.log = []
@@ -66,7 +76,7 @@ class Vehicle(CorridorObject):
         lane_from: Optional[str] = None,
         lane_to: Optional[str] = None,
         lane_id: Optional[int] = None,
-        spacing: float = 0.0
+        spacing: float = 1.0
     ) -> "Vehicle":
         """
         Create a random vehicle on the road.
@@ -92,7 +102,7 @@ class Vehicle(CorridorObject):
         # _from = "lateral_passing"
         # _to ="vertical_passing"
         _id = _from
-        lane = corridor.lane_network.lanes[_from]
+        lane : StraightLane = corridor.lane_network.lanes[_from]
         if speed is None:
             speed = np.random.uniform(
                 cls.MIN_SPEED_MS, 
@@ -105,13 +115,15 @@ class Vehicle(CorridorObject):
         #     longitudinal=lane.length_m,
         #     lateral=0
         # )
-        offset = spacing*default_spacing   
+        offset = spacing*default_spacing
         if len(corridor.vehicles):
-            x0 = np.max([v.position[0] for v in corridor.vehicles])
+            # x0 = np.max([v.position[0] for v in corridor.vehicles])
+            x0 = np.max([lane.local_coordinates(v.position)[0] for v in corridor.vehicles])
         else:
-            x0 = 3 * default_spacing     
+            x0 = 2 * default_spacing     
 
-        x0 += offset * corridor.np_random.uniform(0.8, 1.2)
+        x0 += offset * corridor.np_random.uniform(0.1, 1.2)
+        print("x0: ", x0)
         position = lane.position(longitudinal=x0,lateral=0)
 
         lane_heading = lane.heading_at()
@@ -147,7 +159,6 @@ class Vehicle(CorridorObject):
                             self.action['pitch_cmd'],
                             yaw_cmd,
                             speed_input])
-        
         new_states = self.plane.rk45(
             self.plane.state_info, action, dt)
         self.on_state_update()

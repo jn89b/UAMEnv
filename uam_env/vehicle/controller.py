@@ -121,4 +121,3 @@ class Controller():
     
         return (pitch_rate, pitch_command)
         
-    

@@ -56,7 +56,8 @@ class IDMVehicle(Vehicle):
             self.timer = 0
             
         self.enable_lane_change = True
-        
+        self.change_lane = True
+        self.change_time_interval = np.random.randint(10, 20)
         if controller is None:
             self.controller = Controller()
         else:
@@ -225,6 +226,7 @@ class IDMVehicle(Vehicle):
             ego_target_speed = np.clip(
                 ego_target_speed, 0, ego_vehicle.lane.speed_limit
             )
+            
         acceleration = self.COMFORT_ACC_MAX * (
             1
             - np.power(
@@ -232,12 +234,12 @@ class IDMVehicle(Vehicle):
                 self.DELTA,
             )
         )
-
         if front_vehicle:
-            d = ego_vehicle.lane_distance_to(front_vehicle)
+            d = ego_vehicle.lane_distance_to(front_vehicle, front_vehicle.lane)
             acceleration -= self.COMFORT_ACC_MAX * np.power(
                 self.desired_gap(ego_vehicle, front_vehicle) / utils.not_zero(d), 2
             )
+
         return acceleration
 
     def step(self, dt:float) -> None:
@@ -265,6 +267,21 @@ class IDMVehicle(Vehicle):
         if self.enable_lane_change:
             self.change_lane_policy()
             
+        #make the vehicle change lanes after a certain time
+        if self.timer // self.change_time_interval == 1 and \
+            self.timer != 0 and self.change_lane:
+            self.change_lane = False
+            keep_lane_or_change = np.random.choice([0,1])
+            # keep_lane_or_change = 1
+            if keep_lane_or_change == 1:
+                lane_names = list(self.corridor.lane_network.lanes.keys())
+                #remove the current lane from the list
+                lane_names.remove(self.lane_index)
+                random_lane = np.random.choice(lane_names)
+                # print(f"Changing lane from {self.lane_index} to {random_lane}")
+                self.target_lane_index = random_lane
+                # self.lane = self.corridor.lane_network.lanes[self.target_lane_index]
+                
         action = {
             'roll_cmd': None,
             'pitch_cmd': None,
@@ -328,6 +345,7 @@ class IDMVehicle(Vehicle):
         # I had to add a negative to invert the pitch command
         action["pitch_rate_cmd"] = -pitch_rate_cmd
         action["heading_rate_cmd"] = heading_rate_cmd
+    
     
         Vehicle.act(
             self, action

@@ -20,6 +20,8 @@ class Visualizer(object):
         self.min_y = 1000
         self.max_y = -1000
     
+    
+    
     def show_lanes_2D(self, lanes:LaneNetwork) -> Tuple[plt.Figure, plt.Axes]:
         fig, ax = plt.subplots()
         for key, straight_lane in lanes.lanes.items():
@@ -40,15 +42,56 @@ class Visualizer(object):
 
     def show_lanes_3d(self, lanes:LaneNetwork,
                       uam_env:UAMEnv=None, 
-                      plot_vehicles:bool=False) -> Tuple[plt.Figure, plt.Axes]:
+                      plot_vehicles:bool=False,
+                      zoom_in:bool=True) -> Tuple[plt.Figure, plt.Axes]:
+        
         fig, ax = plt.subplots(subplot_kw={'projection': '3d'},
-                               figsize=(10, 10))
+                               figsize=(12, 12))
+        
         for key, straight_lane in lanes.lanes.items():
+            lane_color = lane_config.LANE_COLORS[key]
             x = [straight_lane.start[0], straight_lane.end[0]]
             y = [straight_lane.start[1], straight_lane.end[1]]
             z = [straight_lane.start[2], straight_lane.end[2]]
-            ax.plot(x, y, z, label=key + ' centerline', linestyle='--')
+            ax.plot(x, y, z, linestyle='--',
+                    color='black')
         
+        #def the draw lanes as a cylinder
+        for key, straight_lane in lanes.lanes.items():
+            lane: StraightLane = straight_lane
+            theta = lane.heading_rad
+            lane_color = lane_config.LANE_COLORS[key]
+            x_position = lane.start[0]
+            y_position = lane.start[1]
+            z_position = lane.start[2]
+            #direction vector components (cosine and sine of the angle)
+            dx = np.cos(theta)
+            dy = np.sin(theta)
+            
+            NUM_POINTS = 50
+            #create the cylinder's sides
+            z = np.linspace(0, lane_config.LANE_LENGTH_M, NUM_POINTS)
+            
+            theta_cylinder = np.linspace(0, 2 * np.pi, NUM_POINTS)
+            theta_grid, z_grid = np.meshgrid(theta_cylinder, z)
+            
+            x_grid = lane_config.LANE_WIDTH_M/2 * np.cos(theta_grid)
+            y_grid = lane_config.LANE_HEIGHT_M/2 * np.sin(theta_grid)
+            
+            #rotate the cylinder to align with the heading angle
+            x_rotated = x_position + dx * z_grid - dy * x_grid
+            y_rotated = y_position + dy * z_grid + dx * x_grid
+            z_rotated = z_position + y_grid
+            
+            #plot the transparent surface of the cylinder
+            ax.plot_surface(x_rotated, y_rotated, z_rotated, 
+                            color=lane_color, alpha=0.3, rstride=5, cstride=5,
+                            label=key)
+            ax.plot_wireframe(x_rotated, y_rotated, z_rotated, 
+                              color=lane_color, rstride=5, cstride=5,
+                              alpha=0.3)
+            
+            
         if plot_vehicles:
             self.plot_vehicles(uam_env, ax)
         
@@ -60,7 +103,8 @@ class Visualizer(object):
     
         return fig, ax
     
-    def plot_vehicles(self, uam_env:UAMEnv, ax=None) -> None:
+    def plot_vehicles(self, uam_env:UAMEnv, ax=None,
+                      zoom_in:bool=True) -> None:
         min_x = 1000 
         max_x = -1000
         min_y = 1000
@@ -69,7 +113,8 @@ class Visualizer(object):
             data = vehicle.plane.data_handler
             #choose a random color
             color = np.random.rand(3,)
-            ax.plot(data.x, data.y, data.z, label=f"Vehicle {i}", color=color)
+            ax.plot(data.x, data.y, data.z, label=f"Vehicle {i}", color=color,
+                    linewidth=3)
             ax.scatter(data.x[0] , data.y[0], data.z[0], color=color, marker='o')
             if min(data.x) < min_x:
                 min_x = min(data.x)
@@ -82,8 +127,10 @@ class Visualizer(object):
         
         buffer = 10
         ax.legend()
-        ax.set_xlim(min_x-buffer, max_x+buffer)
-        ax.set_ylim(min_y-buffer, max_y+buffer)
+        if zoom_in:
+            ax.set_xlim(min_x-buffer, max_x+buffer)
+            ax.set_ylim(min_y-buffer, max_y+buffer)
+        
         return ax
     
     def animate_vehicles(self, uam_env:UAMEnv) -> None:
@@ -95,7 +142,8 @@ class Visualizer(object):
             color = np.random.rand(3,)
             
             # Initialize a line and a scatter plot
-            line, = self.ax.plot([], [], [], label=f"Vehicle {i}", color=color)
+            line, = self.ax.plot([], [], [], label=f"Vehicle {i}", color=color,
+                                 linewidth=3)
             scatter = self.ax.scatter([], [], [], color=color, marker='o')
             
             self.lines.append(line)

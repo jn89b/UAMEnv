@@ -27,10 +27,12 @@ class StraightLane(object):
     def __init__(self,
                  start:Vector,
                  end:Vector,
+                 lane_name = None,
                  width_m:float = lane_config.LANE_WIDTH_M,
                  height_m:float = lane_config.LANE_HEIGHT_M) -> None:
         self.start = start
         self.end = end
+        self.lane_name = lane_name
         self.width_m = width_m
         self.height_m = height_m
         self.length_m = np.linalg.norm(self.end - self.start)
@@ -44,11 +46,11 @@ class StraightLane(object):
         self.init_boundaries()
         
     def on_lane(self,
-                position:Vector,
+                position: Vector,
                 longitudinal: float = None,
-                lateral:float = None,
-                margin:float = 0,
-                vehicle_length_m:float = kinematics_config.LENGTH_m) -> bool:
+                lateral: float = None,
+                margin: float = 0,
+                vehicle_length_m: float = kinematics_config.LENGTH_m) -> bool:
         """
         Whether a given world position is on the lane.
 
@@ -56,18 +58,24 @@ class StraightLane(object):
         :param longitudinal: (optional) the corresponding longitudinal lane coordinate, if known [m]
         :param lateral: (optional) the corresponding lateral lane coordinate, if known [m]
         :param margin: (optional) a supplementary margin around the lane width
+        :param vehicle_length_m: (optional) the length of the vehicle [m]
         :return: is the position on the lane?
         """
+        # If longitudinal and lateral coordinates are not provided, calculate them
         if longitudinal is None or lateral is None:
             longitudinal, lateral = self.local_coordinates(position)
-        
-        # check if the vehicle is within the lane
-        if np.abs(lateral) > self.width_m / 2 + margin and \
-                np.abs(lateral) > self.width_m / 2 + vehicle_length_m / 2:
+
+        # Check if the vehicle's lateral position is within the lane's width plus margin
+        if np.abs(lateral) > self.width_m / 2 + margin:
             return False
         
-        return True
+        # Alternatively, check if the vehicle's lateral position plus half its length is within the lane's width
+        if np.abs(lateral) > self.width_m / 2 + vehicle_length_m / 2:
+            return False
         
+        # If neither condition is violated, return True
+        return True
+
     def position(self, longitudinal:float, lateral:float) -> Vector:
         """
         Get the position of the vehicle in the lane
@@ -233,8 +241,6 @@ class LaneNetwork(object):
         distances = []
         for zone_name, straight_lane in self.lanes.items():
             longitudinal, lateral = straight_lane.local_coordinates(position)
-            print("Longitudinal: ", longitudinal)
-            print("Lateral: ", lateral)
             closest_position = straight_lane.position(longitudinal, lateral)
             closest_points.append(closest_position)
             distances.append(np.linalg.norm(closest_position - position))
@@ -342,6 +348,12 @@ class Corridor(object):
             vehicle.step(dt)
         
         #TODO: handle collisions between vehicles
+        for i, vehicle in enumerate(self.vehicles):
+            for other in self.vehicles[i + 1:]:
+                vehicle.handle_collisions(other, dt)
+            for other in self.objects:
+                vehicle.handle_collisions(other, dt)
+            
 
     def neighbor_vehicles(self, ego_vehicle:"Vehicle",
                           lane_index:str) -> Tuple[Optional["Vehicle"], Optional["Vehicle"]]:
@@ -359,12 +371,12 @@ class Corridor(object):
         if not lane_index:
             return None, None
         lane: StraightLane = self.lane_network.lanes[lane_index]
-        s = lane.local_coordinates(ego_vehicle.position)
+        s,_ = lane.local_coordinates(ego_vehicle.position)
         s_front = s_rear = None # front and rear vehicle distances
         v_front = v_rear = None # speed of the front and rear vehicle
         
         for v in self.vehicles + self.objects:
-            if v is not ego_vehicle and not isinstance(v, CorridorObject):
+            if v is not ego_vehicle: #and not isinstance(v, CorridorObject):
                 s_v, lat_v = lane.local_coordinates(v.position)
                 if not lane.on_lane(v.position, s_v, lat_v, margin=1):
                     continue
@@ -374,7 +386,6 @@ class Corridor(object):
                 if s_v < s and (s_rear is None or s_v > s_rear):
                     s_rear = s_v
                     v_rear = v
-                    
         return v_front, v_rear
         
     def __repr__(self):
