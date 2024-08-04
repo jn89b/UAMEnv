@@ -127,13 +127,13 @@ class IDMVehicle(Vehicle):
                     and v.lane_index != self.target_lane_index
                     and isinstance(v, IDMVehicle) 
                     and v.lane_index == self.lane_index):
-                    distance = self.lane_distance_to(v)
+                    distance = self.lane_distance_to(v, v.lane)
                     desired_distance = self.desired_gap(self, v)
                     
                     if 0 < distance < desired_distance:
-                        if self._is_safe_to_change(v):
-                            self.target_lane_index = self.target_lane_index
-                            break
+                        # if self._is_safe_to_change(v):
+                        self.target_lane_index = self.target_lane_index
+                        break
             return 
 
         # # else, at a given frequency,
@@ -318,12 +318,15 @@ class IDMVehicle(Vehicle):
         
         #action["roll_cmd"] = roll_ref
         action["roll_cmd"] = roll_ref
-        action["pitch_cmd"] = pitch_command
+        # I had to add a negative to invert the pitch command
+        action["pitch_cmd"] = -pitch_command
         action["yaw_cmd"] = heading_ref
         #this will continously change the heading of the vehicle
         #current vehicle heading
         action["roll_rate_cmd"] = roll_rate_cmd
-        action["pitch_rate_cmd"] = pitch_rate_cmd
+        
+        # I had to add a negative to invert the pitch command
+        action["pitch_rate_cmd"] = -pitch_rate_cmd
         action["heading_rate_cmd"] = heading_rate_cmd
     
         Vehicle.act(

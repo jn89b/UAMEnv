@@ -21,8 +21,10 @@ data_info = []
 
 for i, vehicle in enumerate(uam_env.corridors.vehicles):
     data = vehicle.plane.data_handler
-    ax.plot(data.x, data.y, data.z, label=f"Vehicle {i}")
-    ax.scatter(data.x[0] , data.y[0], data.z[0], color='red')
+    #choose a random color
+    color = np.random.rand(3,)
+    ax.plot(data.x, data.y, data.z, label=f"Vehicle {i}", color=color)
+    ax.scatter(data.x[0] , data.y[0], data.z[0], color=color, marker='o')
 
 ax.legend()
 plt.show()

@@ -43,7 +43,6 @@ class StraightLane(object):
                                   self.end[0] - self.start[0])
         self.init_boundaries()
         
-    
     def on_lane(self,
                 position:Vector,
                 longitudinal: float = None,
@@ -140,9 +139,9 @@ class LaneNetwork(object):
     """
     def __init__(self) -> None:
         self.lanes = {
-            'lateral': None,
-            'lateral_passing': None,
-            'vertical_passing': None
+            lane_config.LANE_LATERAL_KEY: None,
+            lane_config.LANE_LATERAL_PASSING_KEY: None,
+            lane_config.LANE_VERTICAL_PASSING_KEY: None
         }
     
     def get_lane_names(self) -> List[str]:
@@ -214,9 +213,9 @@ class LaneNetwork(object):
                                              vertical_passing_z])
         
         return {
-            'lateral': start_vector_m,
-            'lateral_passing': lateral_passing_point,
-            'vertical_passing': vertical_passing
+            lane_config.LANE_LATERAL_KEY: start_vector_m,
+            lane_config.LANE_LATERAL_PASSING_KEY: lateral_passing_point,
+            lane_config.LANE_VERTICAL_PASSING_KEY: vertical_passing
         }
         
     

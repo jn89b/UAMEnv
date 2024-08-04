@@ -2,7 +2,7 @@ import copy
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
-
+import math as m 
 from uam_env.corridor.corridor import Corridor, StraightLane
 from uam_env.utils import Vector
 from uam_env.vehicle.kinematics import Vehicle
@@ -20,11 +20,19 @@ class Controller():
     KP_HEADING = controller_config.KP_HEADING
     KD_HEADING = controller_config.KD_HEADING
     KP_ROLL = 0.1
+
+    # KP_ROLL = controller_config.KP_ROLL
+    # KD_ROLL = controller_config.KD_
+
+    KP_PITCH = controller_config.KP_PITCH
+    KD_PITCH = controller_config.KD_PITCH
+    
     KP_LATERAL = 1 / TAU_LATERAL
     KP_PHI = 1 / TAU_PURSUIT
     
     def __init__(self) -> None:
         self.old_heading_error = 0.0
+        self.old_pitch_error = 0.0
     
     def steering_control(self, target_lane:StraightLane,
                          ego_position:Vector,
@@ -82,14 +90,35 @@ class Controller():
     
     def pitch_control(self, target_lane:StraightLane, 
                              ego_vehicle:Vehicle) -> Tuple[float, float]:
-        lane_coords = target_lane.local_coordinates(ego_vehicle.position)
+        
+        long, lat = target_lane.local_coordinates(ego_vehicle.position)
+        lane_next_coords = long + (ego_vehicle.speed * self.TAU_PURSUIT)
+        lane_future_heading = target_lane.heading_at(lane_next_coords)
+        lateral_speed_command = -self.KP_LATERAL * lat
+        dx = lane_next_coords - long
+        dy = lateral_speed_command
+        dr = m.sqrt(dx**2 + dy**2)
+    
         target_lane_z = target_lane.start[2]
-        desired_altitude = target_lane_z - ego_vehicle.position[2]
+        dz = target_lane_z - ego_vehicle.position[2]
+        desired_pitch = np.arctan2(dz, dr)
         
         current_pitch_rad = np.deg2rad(ego_vehicle.pitch_dg)
-        pitch_command = self.KP_PHI * (desired_altitude - current_pitch_rad)
+        pitch_error = desired_pitch - current_pitch_rad
+        P_pitch = self.KP_PITCH * pitch_error
+        D_pitch = self.KD_PITCH * (pitch_error - self.old_pitch_error) / 0.1
+        pitch_command = P_pitch + D_pitch
         pitch_rate = (pitch_command - current_pitch_rad) / self.TAU_ACC
-        
+    
+        pitch_command = np.clip(pitch_command, 
+                                controller_config.PITCH_MIN, 
+                                controller_config.PITCH_MAX)
+
+        self.old_pitch_error = pitch_command        
+        if abs(dz) <= 3:
+            pitch_command = 0.0
+            pitch_rate = 0.0
+    
         return (pitch_rate, pitch_command)
         
     

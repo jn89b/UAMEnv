@@ -4,6 +4,7 @@ import numpy as np
 from uam_env.corridor.corridor import StraightLane, LaneNetwork, Corridor
 from uam_env.config import lane_config
 
+
 import matplotlib.pyplot as plt
 
 class Visualizer(object):
@@ -36,5 +37,6 @@ class Visualizer(object):
             z = [straight_lane.start[2], straight_lane.end[2]]
             ax.plot(x, y, z, label=key + 'centerline', linestyle='--')
         ax.legend()
-        
+        ax.set_xlim(0, lane_config.LANE_LENGTH_M)
+        ax.set_ylim(0, lane_config.LANE_LENGTH_M/4)
         return fig, ax

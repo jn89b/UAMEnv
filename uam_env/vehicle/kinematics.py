@@ -89,8 +89,8 @@ class Vehicle(CorridorObject):
         lane_names = list(corridor.lane_network.lanes.keys())
         _from = lane_from or random.choice(lane_names)
         _to = lane_to or random.choice(lane_names)
-        _from = "lateral"
-        _to ="lateral_passing"
+        # _from = "lateral_passing"
+        # _to ="vertical_passing"
         _id = _from
         lane = corridor.lane_network.lanes[_from]
         if speed is None:
@@ -142,7 +142,6 @@ class Vehicle(CorridorObject):
         speed_input = np.clip(speed_input, 
                               self.MIN_SPEED_MS, 
                               self.MAX_SPEED_MS)
-        # yaw_cmd = np.clip(yaw_input, np.deg2rad(-15), np.deg2rad(15))
         yaw_cmd = yaw_input
         action = np.array([self.action['roll_cmd'],
                             self.action['pitch_cmd'],

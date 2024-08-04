@@ -50,7 +50,7 @@ class UAMEnv(gym.Env):
         config.update({
             "n_vehicles": 10,
             "n_corridors": 1,
-            "non_controlled_vehicles": 1,
+            "non_controlled_vehicles": 5,
             "controlled_vehicles": 1,
             "lane_network": None,
             "record_history": True,
