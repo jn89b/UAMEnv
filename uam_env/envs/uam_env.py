@@ -4,8 +4,7 @@ from uam_env.vehicle.kinematics import Vehicle
 from uam_env.vehicle.behavior import IDMVehicle
 from uam_env.config import kinematics_config
 from typing import Dict, List, Optional, Text, Tuple, TypeVar
-
-
+from uam_env.config import env_config
 import numpy as np
 import gymnasium as gym
 
@@ -50,13 +49,13 @@ class UAMEnv(gym.Env):
         config.update({
             "n_vehicles": 10,
             "n_corridors": 1,
-            "non_controlled_vehicles": 5,
-            "controlled_vehicles": 1,
+            "non_controlled_vehicles": env_config.NON_CONTROLLED_VEHICLES,
+            "controlled_vehicles": env_config.CONTROLLED_VEHICLES,
             "lane_network": None,
             "record_history": True,
             "initial_lane_id": None,
             'ego_spacing': 2.0,
-            "duration": 30, # seconds
+            "duration": env_config.DURATION, # seconds
             "n_observation": 10, #TODO: Define observation spaceS
             "n_actions": 6, #TODO: Define Number of actions
             "n_rewards": 1, #TODO: Define Number of rewards

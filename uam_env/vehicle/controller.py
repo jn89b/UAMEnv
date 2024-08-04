@@ -115,7 +115,7 @@ class Controller():
                                 controller_config.PITCH_MAX)
 
         self.old_pitch_error = pitch_command        
-        if abs(dz) <= 3:
+        if abs(dz) <= 1.0:
             pitch_command = 0.0
             pitch_rate = 0.0
     
