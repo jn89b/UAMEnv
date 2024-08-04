@@ -98,7 +98,14 @@ class Vehicle(CorridorObject):
         
         lane_names = list(corridor.lane_network.lanes.keys())
         _from = lane_from or random.choice(lane_names)
-        _to = lane_to or random.choice(lane_names)
+        #random 0 or 1
+        change_lane = random.choice([0, 1])
+        change_lane = 0
+        if change_lane:
+            lane_names.remove(_from)
+            _to = lane_to or random.choice(lane_names)
+        else:
+            _to = _from
         # _from = "lateral_passing"
         # _to ="vertical_passing"
         _id = _from

@@ -57,7 +57,7 @@ class IDMVehicle(Vehicle):
             
         self.enable_lane_change = True
         self.change_lane = True
-        self.change_time_interval = np.random.randint(10, 20)
+        self.change_time_interval = np.random.randint(5, 20)
         if controller is None:
             self.controller = Controller()
         else:
