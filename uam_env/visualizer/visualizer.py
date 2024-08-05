@@ -179,8 +179,9 @@ class Visualizer(object):
 
         # Create the animation
         anim = FuncAnimation(self.fig, self.update_plot, frames=len(data.x), interval=10, blit=True)
-
+        #save as gif        
         plt.legend()
+        # anim.save('animation.gif', writer='imagemagick', fps=30)
         plt.show()
 
     def update_plot(self, frame):

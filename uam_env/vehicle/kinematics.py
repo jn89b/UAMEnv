@@ -128,7 +128,7 @@ class Vehicle(CorridorObject):
             #x0 = np.random.uniform(max_value, kinematics_config.LENGTH_m)
         else:
             x0 = 3 * default_spacing     
-        x0 += offset * corridor.np_random.uniform(0.5, 1.2) #+ default_spacing 
+        x0 += offset * corridor.np_random.uniform(0.75, 1.0) #+ default_spacing 
         position = lane.position(longitudinal=x0,lateral=0)
         lane_heading = lane.heading_at()
         vehicle = cls(corridor=corridor, 

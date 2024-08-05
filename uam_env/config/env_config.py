@@ -3,7 +3,7 @@ A config file for the UAMENV
 """
 # from config import lane_config
 
-NON_CONTROLLED_VEHICLES = 30
+NON_CONTROLLED_VEHICLES = 8
 CONTROLLED_VEHICLES = 1
 RECORD_HISTORY = True
 DURATION = 30
