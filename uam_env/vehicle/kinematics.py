@@ -169,7 +169,6 @@ class Vehicle(CorridorObject):
         self.plane.set_info(new_states)
     
     def on_state_update(self) -> None:
-        
         states = self.plane.get_info()
         self.position = np.array([states[0], states[1], states[2]])
         self.roll_dg = np.rad2deg(states[3])
@@ -226,7 +225,6 @@ class DataHandler():
         
     def update_time(self, time:float) -> None:
         self.time.append(time)
-
 
 class Plane():
     def __init__(self, 

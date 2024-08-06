@@ -1,14 +1,14 @@
 import numpy as np
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, TYPE_CHECKING
 
 from uam_env import utils
 from uam_env.config import kinematics_config, env_config
-from uam_env.corridor.corridor import Corridor, CorridorObject, StraightLane
 from uam_env.vehicle.kinematics import Vehicle
 from uam_env.utils import Vector
 from uam_env.vehicle.controller import Controller
 
-
+if TYPE_CHECKING:
+    from uam_env.corridor.corridor import Corridor, CorridorObject, StraightLane
 
 class IDMVehicle(Vehicle):
     """
@@ -35,7 +35,7 @@ class IDMVehicle(Vehicle):
     
     def __init__(
         self,
-        corridor:Corridor,
+        corridor:"Corridor",
         position:Vector,
         roll_dg:float=0,
         pitch_dg:float=0,
@@ -381,7 +381,7 @@ class DiscreteVehicle(IDMVehicle):
     DISCRETE_ACTION_MAPPING = env_config.DISCRETE_ACTION_MAPPING
     LANE_INDEX_MAPPING = env_config.LANE_INDEX_MAPPING
     def __init__(self, 
-                 corridor: Corridor, 
+                 corridor: "Corridor", 
                  position: np.ndarray, 
                  roll_dg: float = 0, 
                  pitch_dg: float = 0, 

@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 from uam_env.utils import Vector
 from uam_env.config import lane_config, kinematics_config
 from uam_env.vehicle.kinematics import Vehicle
+from uam_env.vehicle.behavior import IDMVehicle
 # from uam_env.vehicle.behavior import DiscreteVehicle
 from uam_env.vehicle.objects import CorridorObject
 import numpy as np
@@ -189,12 +190,12 @@ class LaneNetwork(object):
         |
         --> x/y
         
-                    Vertical Passing
-                /                   \
-            /                           \
-        /                                   \
-        origin ---------------------lateral passing
-    <-----Width Lane------>     <-----Width Lane------> 
+                        Vertical Passing
+                    /                   \
+                /                           \
+            /                                   \
+            origin ---------------------lateral passing
+        <-----Width Lane------>     <-----Width Lane------> 
         
         """
         heading_rad = np.deg2rad(heading_dg)
@@ -365,6 +366,58 @@ class Corridor(object):
             for other in self.objects:
                 vehicle.handle_collisions(other, dt)
             
+
+    def close_objects_to(
+        self, 
+        vehicle: "IDMVehicle",
+        distance_threshold: float,
+        count: Optional[int] = None, 
+        see_behind: bool=True,
+        sort: bool = True,
+        vehicles_only : bool = False) -> Dict:
+        """
+        Locate the objects close to the vehicle
+        Returns a hash map of the closest objects to the vehicle
+        :param vehicle: The vehicle to check
+        :param distance_threshold: The distance threshold to check
+        :param count: The number of vehicles to return
+        :param see_behind: Whether to check behind the vehicle
+        :param sort: Whether to sort the vehicles
+        :param vehicles_only: Whether to return only vehicles
+        :return: A hash map of the closest objects to the vehicle
+        
+        """
+        vehicles = []
+        #TODO: might need to refactor this I'm going to have to do 
+        # two calculations
+        close_objects = {}
+        
+        #create keys for number of vehicles
+        for i in range(count):
+            close_objects[i] = None
+            
+        #TODO: Add a queue to sort the closest vehicles
+        num_vehicle = 0 
+        for other_vehicle in self.vehicles:
+            other_vehicle : IDMVehicle
+            if other_vehicle.agent == False:
+                distance = np.linalg.norm(vehicle.position - other_vehicle.position)
+                signed_distance = vehicle.lane_distance_to(other_vehicle, 
+                                                           other_vehicle.lane)
+                if distance <= distance_threshold and \
+                    abs(signed_distance) <= kinematics_config.MAX_SPEED_MS * 2:
+                    relative_velocity = np.linalg.norm(
+                        vehicle.velocity - other_vehicle.velocity)
+                    close_objects[num_vehicle] = {
+                        'distance': distance,
+                        'velocity': relative_velocity,
+                        'object': other_vehicle
+                    }
+                    num_vehicle += 1
+            if num_vehicle == count:
+                break
+    
+        return close_objects
 
     def neighbor_vehicles(self, ego_vehicle:"Vehicle",
                           lane_index:str) -> Tuple[Optional["Vehicle"], Optional["Vehicle"]]:

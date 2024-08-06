@@ -4,7 +4,7 @@ from uam_env.vehicle.kinematics import Vehicle
 from uam_env.vehicle.behavior import IDMVehicle, DiscreteVehicle
 from uam_env.config import kinematics_config
 from typing import Dict, List, Optional, Text, Tuple, TypeVar
-from uam_env.config import env_config
+from uam_env.config import env_config, kinematics_config, lane_config
 import numpy as np
 import gymnasium as gym
 from gym import spaces
@@ -41,9 +41,18 @@ class UAMEnv(gym.Env):
         self.time = 0 #simulation time 
         self.steps = 0 
         self.done = False
+        self.n_neighbors = 2
         self.action_space = spaces.Discrete(
             env_config.NUM_ACTIONS)
-    
+        
+        self.state_constraints = kinematics_config.state_constraints
+        self.ego_obs_space = self.init_ego_observation()
+        
+        self.observation_space = spaces.Dict(
+            {
+                "ego": self.ego_obs_space
+            })
+
     @classmethod
     def default_config(cls) -> dict:
         #config = super().default_config()
@@ -68,6 +77,66 @@ class UAMEnv(gym.Env):
         
         return config 
     
+    @property
+    def vehicle(self) -> Vehicle:
+        """First (default) controlled vehicle."""
+        return self.controlled_vehicles[0] \
+            if self.controlled_vehicles else None
+
+    def init_ego_observation(self) -> spaces.Box:
+        """
+        State orders are as follows:
+        x, (east) (m)
+        y, (north) (m)
+        z, (up) (m)
+        roll, (rad)
+        pitch, (rad)
+        yaw, (rad)
+        airspeed (m/s)
+        
+        For our neighbors we want to consider 
+        relative positions and velocities of the vehicles
+        """
+
+        low_obs = [
+            self.state_constraints['x_min'],
+            self.state_constraints['y_min'],
+            self.state_constraints['z_min'],
+            self.state_constraints['phi_min'],
+            self.state_constraints['theta_min'],
+            self.state_constraints['psi_min'],
+            self.state_constraints['airspeed_min']
+        ]
+        
+        high_obs = [
+            self.state_constraints['x_max'],
+            self.state_constraints['y_max'],
+            self.state_constraints['z_max'],
+            self.state_constraints['phi_max'],
+            self.state_constraints['theta_max'],
+            self.state_constraints['psi_max'],
+            self.state_constraints['airspeed_max']
+        ]
+        
+        #TODO: update this to allow user to define n nearest neighbors
+
+        #Order will be:
+        # neighbor 1 (relative distance, relative velocity)
+        n_states = 2
+        relative_max_distance = lane_config.LANE_LENGTH_M
+        for _ in range(self.n_neighbors):
+            for _ in range(n_states):
+                low_obs.append(-relative_max_distance)
+                high_obs.append(relative_max_distance)
+                low_obs.append(-kinematics_config.MAX_SPEED_MS)
+                high_obs.append(kinematics_config.MAX_SPEED_MS)
+        
+        obs_space = spaces.Box(low=np.array(low_obs),
+                                            high=np.array(high_obs),
+                                            dtype=np.float32)
+                
+        return obs_space
+    
     def _create_corridors(self) -> None:
         """
         User needs to define how many corridors are in the environment
@@ -76,8 +145,7 @@ class UAMEnv(gym.Env):
         self.corridors = Corridor(
             lane_network=self.config["lane_network"],
             np_random = self.np_random,
-            record_history=self.config["record_history"]
-        )
+            record_history=self.config["record_history"])
         
     def reset(self) -> None:
         """
@@ -95,7 +163,8 @@ class UAMEnv(gym.Env):
         other_vehicles = []
         
         n_non_controlled = self.config["non_controlled_vehicles"]
-        total_vehicles = self.config["controlled_vehicles"] + n_non_controlled
+        total_vehicles = self.config["controlled_vehicles"] \
+            + n_non_controlled
         
         #random index to spawn the controlled vehicle
         random_number = np.random.randint(0, total_vehicles)
@@ -126,7 +195,40 @@ class UAMEnv(gym.Env):
             
             self.corridors.vehicles.append(vehicle)
             
+    def _get_observation(self) -> dict:
+        """
+        For the observation we want to get:
+            - Ego vehicle state [x, y, z, roll, pitch, yaw, airspeed]
+            - Then we want to query our 2 nearest neighbors for their 
+                relative distance and velocity
+        """
+        ego_state = self.vehicle.plane.get_info()
+        #now we need to get the nearest neighbors
+        n_neighbors = self.n_neighbors
+        neighbors = self.corridors.close_objects_to(
+            vehicle=self.vehicle,
+            distance_threshold=250,
+            count=n_neighbors,
+            see_behind=True,
+            sort=True,
+            vehicles_only=True)
+        for k, v in neighbors.items():
+            #auto fill the relative position and velocity
+            rel_pos_vel = np.array([
+                lane_config.LANE_LENGTH_M,
+                lane_config.SPEED_LIMIT_MS,
+            ])
+            if v is not None:
+                rel_pos_vel[0] = v['distance']
+                rel_pos_vel[1] = v['velocity']
         
+            #append the ego state to the neighbors
+            ego_state = np.append(ego_state, rel_pos_vel)
+
+        return {
+            "ego": ego_state
+        }
+    
     def simulate(self, action=None) -> None:
         """
         Simulate the environment
@@ -147,7 +249,6 @@ class UAMEnv(gym.Env):
         
         For now the action will be an int since we are using a discrete action space
         
-                
         """
         
         #TODO: Add controled vehicle and test it out
@@ -156,7 +257,15 @@ class UAMEnv(gym.Env):
                 "The corridor and vehicle must be initialized in the environment implementation"
             )
 
-        self.time += 1 / self.config["policy_frequency"]
+        reward = 0
+        terminated = False
+        truncated = False
+        info = {}
+    
+        obs = self._get_observation()
+        print(obs)
+        # self.time += 1 / self.config["policy_frequency"]
+        self.time += 1
         self.simulate(action)
 
         # obs = self.observation_type.observe()

@@ -19,9 +19,7 @@ class Visualizer(object):
         self.max_x = -1000
         self.min_y = 1000
         self.max_y = -1000
-    
-    
-    
+
     def show_lanes_2D(self, lanes:LaneNetwork) -> Tuple[plt.Figure, plt.Axes]:
         fig, ax = plt.subplots()
         for key, straight_lane in lanes.lanes.items():

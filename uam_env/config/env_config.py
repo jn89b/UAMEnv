@@ -3,12 +3,12 @@ A config file for the UAMENV
 """
 # from config import lane_config
 
-NON_CONTROLLED_VEHICLES = 8
+NON_CONTROLLED_VEHICLES = 2
 CONTROLLED_VEHICLES = 1
 RECORD_HISTORY = True
 DURATION = 30
-
 NUM_ACTIONS = 9
+
 """
 The discrete action mapping is as follows
 - Discrete action space:

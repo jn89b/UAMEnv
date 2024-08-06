@@ -1,13 +1,15 @@
 import copy 
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, TYPE_CHECKING
 
 import numpy as np
 import math as m 
-from uam_env.corridor.corridor import Corridor, StraightLane
 from uam_env.utils import Vector
 from uam_env.vehicle.kinematics import Vehicle
 from uam_env.config import controller_config
 from uam_env import utils
+
+if TYPE_CHECKING:
+    from uam_env.corridor.corridor import StraightLane
 
 class Controller():
     KP_LATERAL = controller_config.KP_LATERAL
@@ -34,7 +36,7 @@ class Controller():
         self.old_heading_error = 0.0
         self.old_pitch_error = 0.0
     
-    def steering_control(self, target_lane:StraightLane,
+    def steering_control(self, target_lane:"StraightLane",
                          ego_position:Vector,
                          ego_speed:float,
                          ego_heading_rad:float,
@@ -88,7 +90,7 @@ class Controller():
         
         return (heading_gain, heading_rate_command, roll, roll_rate_command)
     
-    def pitch_control(self, target_lane:StraightLane, 
+    def pitch_control(self, target_lane:"StraightLane", 
                              ego_vehicle:Vehicle) -> Tuple[float, float]:
         
         long, lat = target_lane.local_coordinates(ego_vehicle.position)
@@ -120,4 +122,3 @@ class Controller():
             pitch_rate = 0.0
     
         return (pitch_rate, pitch_command)
-        

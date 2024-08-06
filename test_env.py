@@ -12,7 +12,7 @@ uam_env.reset()
 for i in range(300):
     # Take a random action from the action space (discrete action)
     action = uam_env.action_space.sample()
-    uam_env.simulate(action)
+    uam_env.step(action)
 
 vehicles = uam_env.corridors.vehicles
 #check if crash
@@ -21,8 +21,6 @@ num_crash = 0
 crashed_vehicles = []
 for v in vehicles:
     if v.crashed:
-        print("vehicle number crashed : ", v)
-        print("vehicle velocity: ", v.velocity)
         num_crash += 1
         crashed_vehicles.append(v)
 print("Percentage of vehicles that crashed: ", num_crash/num_vehicles)
@@ -34,5 +32,3 @@ fig, ax = vis.show_lanes_3d(
     plot_vehicles=True, zoom_in=False,
     show_crash=False)
 vis.animate_vehicles(uam_env=uam_env, show_crash=False)
-
-    
