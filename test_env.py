@@ -9,10 +9,12 @@ uam_env = UAMEnv()
 uam_env.reset()
 
 # Simulate the environment
-for i in range(300):
+for i in range(100):
     # Take a random action from the action space (discrete action)
     action = uam_env.action_space.sample()
-    uam_env.step(action)
+    obs, reward, terminated, truncated, info = uam_env.step(action)
+    print("reward: ", reward)
+    
 
 vehicles = uam_env.corridors.vehicles
 #check if crash

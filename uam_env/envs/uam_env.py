@@ -327,7 +327,7 @@ class UAMEnv(gym.Env):
         # not to be confused with goal position
         target_lane_index = self.vehicle.target_lane_index 
         target_lane:StraightLane = \
-            self.corridor.lane_network.lanes[self.target_lane_index]
+            self.corridors.lane_network.lanes[target_lane_index]
         if target_lane.on_lane(self.vehicle.position):
             result_dict["reward"] += 0.1
         else:
@@ -384,7 +384,7 @@ class UAMEnv(gym.Env):
         terminated = results['is_done']
         truncated = results['is_done']
         info = results['info']
-        
+                
         if self.render_mode == "human":
             self.render()
 
