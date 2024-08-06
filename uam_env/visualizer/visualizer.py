@@ -5,6 +5,7 @@ from uam_env.envs.uam_env import UAMEnv
 
 from uam_env.corridor.corridor import StraightLane, LaneNetwork, Corridor
 from uam_env.config import lane_config
+from uam_env.vehicle.kinematics import Vehicle
 from matplotlib.animation import FuncAnimation
 
 import matplotlib.pyplot as plt
@@ -96,6 +97,16 @@ class Visualizer(object):
                                ax=ax, 
                                show_crash=show_crash)
         
+        
+        #plot the goal
+        if uam_env:
+            goal:Vehicle = uam_env.goal
+            goal_position = goal.position
+            ax.scatter(goal_position[0], 
+                    goal_position[1], 
+                    goal_position[2], color='green', marker='x',
+                    label='Goal')
+            
         ax.legend()
         scale = 8
         # ax.set_xlim(0, lane_config.LANE_LENGTH_M)

@@ -1,5 +1,5 @@
 from typing import Dict, Text
-from uam_env.corridor.corridor import Corridor
+from uam_env.corridor.corridor import Corridor, StraightLane
 from uam_env.vehicle.kinematics import Vehicle
 from uam_env.vehicle.behavior import IDMVehicle, DiscreteVehicle
 from uam_env.config import kinematics_config
@@ -35,23 +35,30 @@ class UAMEnv(gym.Env):
     def __init__(self) -> None:
         # super().__init__()
         self.config = self.default_config()
-        self.dt = 0.1
-        
+        self.dt = env_config.DT
+        self.max_num_steps = env_config.MAX_NUM_STEPS
         #Running variables
-        self.time = 0 #simulation time 
+        self.time = 0 #simulation time multiply by dt to get seconds 
         self.steps = 0 
         self.done = False
         self.n_neighbors = 2
-        self.action_space = spaces.Discrete(
-            env_config.NUM_ACTIONS)
-        
+
         self.state_constraints = kinematics_config.state_constraints
         self.ego_obs_space = self.init_ego_observation()
-        
+
+        self.action_space = spaces.Discrete(
+            env_config.NUM_ACTIONS)
+                
         self.observation_space = spaces.Dict(
             {
                 "ego": self.ego_obs_space
             })
+        
+        self._create_corridors()
+        self._create_vehicles()
+        self.goal = self.create_goal()
+        print("goal position: ", self.goal.position)
+
 
     @classmethod
     def default_config(cls) -> dict:
@@ -147,12 +154,39 @@ class UAMEnv(gym.Env):
             np_random = self.np_random,
             record_history=self.config["record_history"])
         
+    def create_goal(self,
+                    set_random:bool=False) -> Vehicle:
+        lateral_lane: StraightLane = self.corridors.lane_network.lanes[
+            lane_config.LANE_LATERAL_KEY]
+        
+        #get lateral lane z position
+        z_position = lateral_lane.start[2]
+        ego_position = self.vehicle.position    
+        min_x = ego_position[0]
+        
+        lane_position = lateral_lane.position(
+            longitudinal=min_x + 200,
+            lateral=0,
+        )
+        goal = Vehicle(
+            corridor=self.corridors,
+            position=lane_position,
+            speed=0)
+        goal.lane = lateral_lane
+        goal.lane_index = lateral_lane.lane_name
+        
+        return goal 
+    
+
     def reset(self) -> None:
         """
         Reset the environment
         """
         self._create_corridors()
         self._create_vehicles()
+        self.time = 0
+        
+        #make sure to randomize the goal position
         
     def _create_vehicles(self) -> None:
         """
@@ -221,14 +255,92 @@ class UAMEnv(gym.Env):
             if v is not None:
                 rel_pos_vel[0] = v['distance']
                 rel_pos_vel[1] = v['velocity']
-        
+
             #append the ego state to the neighbors
             ego_state = np.append(ego_state, rel_pos_vel)
 
         return {
-            "ego": ego_state
+            "ego": ego_state,
+            "neighbors": neighbors
         }
     
+    def get_results(self, obs:np.ndarray) -> Dict:
+        """
+        Reward is :
+        - Stay at safe distance from other vehicles
+        - Get to goal position in the corridor efficiently
+        - We want to penalize the time from being off the lane
+        
+        - Terminal reward:
+            - If the vehicle crashes then the reward is negative
+            - If the vehicle reaches the end of the corridor 
+                then the reward is positive
+            - If the signed distance to the end of the corridor 
+                is negative then the reward is negative
+        """
+        
+        n_states = 7
+        #get beyond the 7 states of the ego vehicle
+        ego_state = obs[:n_states]
+        
+        result_dict = {
+            "is_done": False,
+            "reward": 0.0,
+            "info": {}
+        }
+        
+        ## TERMINAL REWARDS 
+        terminal_penalty = -5.0
+        terminal_reward = 5.0
+        if self.vehicle.crashed:
+            result_dict["is_done"] = True
+            result_dict["reward"] = -1.0
+            return result_dict
+
+        distance = self.vehicle.lane_distance_to(
+            self.goal, self.goal.lane
+        )
+                        
+        if self.vehicle.lane_index == self.goal.lane_index:
+            #we missed the goal
+            if distance < 0:
+                result_dict["is_done"] = True
+                result_dict["reward"] = -1.0
+                return result_dict
+            elif distance < 5.0 and distance <= 0:
+                result_dict["is_done"] = True
+                result_dict["reward"] = 1.0
+                return result_dict
+            
+        #check time limit
+        if self.time > self.max_num_steps:
+            result_dict["is_done"] = True
+            result_dict["reward"] = -1.0
+            return result_dict
+             
+        ## REWARD SHAPING
+        relative_states = obs[n_states:]
+        relative_positions = relative_states[::2]
+        relative_velocities = relative_states[1::2]
+        
+        # reward for staying on desired lane
+        # not to be confused with goal position
+        target_lane_index = self.vehicle.target_lane_index 
+        target_lane:StraightLane = \
+            self.corridor.lane_network.lanes[self.target_lane_index]
+        if target_lane.on_lane(self.vehicle.position):
+            result_dict["reward"] += 0.1
+        else:
+            result_dict["reward"] -= 0.1
+
+        # TODO: reward for maintaining safe distance from other vehicles
+        # maintain safe distance from other vehicles
+        
+        #TODO: penalty for timer
+        result_dict["reward"] -= 0.01
+        
+        return result_dict
+        
     def simulate(self, action=None) -> None:
         """
         Simulate the environment
@@ -241,14 +353,16 @@ class UAMEnv(gym.Env):
         """
         Perform an action and step the environment dynamics.
 
-        The action is executed by the ego-vehicle, and all other vehicles on the road performs their default behaviour
-        for several simulation timesteps until the next decision making step.
+        The action is executed by the ego-vehicle, and all 
+        other vehicles on the road performs their default behaviour
+        for several simulation timesteps until the next decision 
+        making step.
 
         :param action: the action performed by the ego-vehicle
         :return: a tuple (observation, reward, terminated, truncated, info)
         
-        For now the action will be an int since we are using a discrete action space
-        
+        For now the action will be an int since we are 
+        using a discrete action space
         """
         
         #TODO: Add controled vehicle and test it out
@@ -261,18 +375,16 @@ class UAMEnv(gym.Env):
         terminated = False
         truncated = False
         info = {}
-    
+        self.simulate(action)        
         obs = self._get_observation()
-        print(obs)
-        # self.time += 1 / self.config["policy_frequency"]
+        results = self.get_results(obs['ego'])
         self.time += 1
-        self.simulate(action)
-
-        # obs = self.observation_type.observe()
-        # reward = self._reward(action)
-        # terminated = self._is_terminated()
-        # truncated = self._is_truncated()
-        # info = self._info(obs, action)
+        
+        reward += results['reward']
+        terminated = results['is_done']
+        truncated = results['is_done']
+        info = results['info']
+        
         if self.render_mode == "human":
             self.render()
 

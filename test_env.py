@@ -28,7 +28,8 @@ print("Percentage of vehicles that crashed: ", num_crash/num_vehicles)
 # # Visualize the environment
 vis = Visualizer()
 fig, ax = vis.show_lanes_3d(
-    uam_env.corridors.lane_network, uam_env=uam_env, 
+    uam_env.corridors.lane_network, 
+    uam_env=uam_env, 
     plot_vehicles=True, zoom_in=False,
     show_crash=False)
 vis.animate_vehicles(uam_env=uam_env, show_crash=False)

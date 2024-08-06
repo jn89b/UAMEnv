@@ -117,10 +117,6 @@ class Vehicle(CorridorObject):
         default_spacing = kinematics_config.BUFFER_SPACING_M \
             + (1 * speed)
                         
-        # position = lane.position(
-        #     longitudinal=lane.length_m,
-        #     lateral=0
-        # )
         offset = spacing*default_spacing
         if len(corridor.vehicles):
             x0 = np.max([v.position[0] for v in corridor.vehicles])

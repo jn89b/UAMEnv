@@ -1,14 +1,16 @@
 """
-A config file for the UAMENV
+These are parameters you can set to change the behavior of the environment
 """
-# from config import lane_config
-
 NON_CONTROLLED_VEHICLES = 2
 CONTROLLED_VEHICLES = 1
 RECORD_HISTORY = True
 DURATION = 30
 NUM_ACTIONS = 9
+DT = 0.1
+MAX_NUM_STEPS = 200 
 
+
+##### LANE CONFIG  MAPPING  #####
 """
 The discrete action mapping is as follows
 - Discrete action space:
