@@ -3,6 +3,8 @@ __pycache__/
 
 uam_env/__pycache__/
 
+ray_results/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

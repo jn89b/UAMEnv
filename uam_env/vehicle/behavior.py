@@ -401,7 +401,8 @@ class DiscreteVehicle(IDMVehicle):
                          controller)
         
         self.agent = True
-        self.change_time_interval = 3
+        self.change_time_interval = 1
+        self.start_time = self.timer 
         
     def act(self, meta_action:int) -> dict:
         """
@@ -435,20 +436,24 @@ class DiscreteVehicle(IDMVehicle):
             'heading_rate_cmd': None,
             'acceleration': None,
         }
+        meta_action = int(meta_action)
         if isinstance(meta_action, int):
             lane_encoding, acceleration = self.DISCRETE_ACTION_MAPPING[meta_action]
             # Use lane_encoding and acceleration as needed
         else:
             raise ValueError(f"Expected action to be an integer, but got {type(action).__name__}")
         
-        if self.timer // self.change_time_interval == 1 and \
-            self.timer != 0:
+        target_lane = self.corridor.lane_network.lanes[self.target_lane_index]
+
+        #check if one second has passed
+        if self.timer - self.start_time > self.change_time_interval:
+            self.start_time = self.timer
             lane_encoding, acceleration = self.DISCRETE_ACTION_MAPPING[int(meta_action)]
             target_lane_index = self.LANE_INDEX_MAPPING[lane_encoding]
             self.target_lane_index = target_lane_index
-        
-        target_lane = self.corridor.lane_network.lanes[self.target_lane_index]
+            target_lane = self.corridor.lane_network.lanes[self.target_lane_index]
 
+        acceleration = acceleration*self.ACC_MAX/2
         # Lateral Control
         heading_ref, heading_rate_cmd, roll_ref, roll_rate_cmd = \
             self.controller.steering_control(

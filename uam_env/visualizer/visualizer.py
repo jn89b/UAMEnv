@@ -160,13 +160,16 @@ class Visualizer(object):
             # color = np.random.rand(3,)
             if vehicle.agent:
                 color = 'blue'
+                alpha = 1.0
             else:
                 color = 'red'
+                alpha = 0.3
             
             # Initialize a line and a scatter plot
             line, = self.ax.plot([], [], [], label=f"Vehicle {i}", color=color,
-                                 linewidth=3)
-            scatter = self.ax.scatter([], [], [], color=color, marker='o')
+                                 linewidth=3, alpha=alpha)
+            scatter = self.ax.scatter([], [], [], color=color, 
+                                      marker='o', alpha=alpha)
             
             self.lines.append(line)
             self.scatters.append(scatter)
@@ -189,14 +192,32 @@ class Visualizer(object):
         # Create the animation
         anim = FuncAnimation(self.fig, self.update_plot, frames=len(data.x), interval=10, blit=True)
         #save as gif        
-        plt.legend()
-        # anim.save('animation.gif', writer='imagemagick', fps=30)
-        plt.show()
+            
+        return self.fig, self.ax, anim
+
+
+    def plot_ego_state(self, uam_env:UAMEnv, ax=None) -> Tuple[plt.Figure, plt.Axes]:
+        ego_vehicle = uam_env.corridors.vehicles[0]
+        data = ego_vehicle.plane.data_handler
+
+        fig,ax = plt.subplots(4,1, figsize=(10,10))
+        # time = np.arange(0, len(data.x), uam_env.dt)
+        time = np.arange(0, len(data.x))
+        time = time * uam_env.dt
+        ax[0].plot(time,np.rad2deg(data.roll), label='roll')
+        ax[1].plot(time,np.rad2deg(data.pitch), label='pitch')
+        ax[2].plot(time,np.rad2deg(data.yaw), label='yaw')
+        ax[3].plot(time,data.u, label='airspeed')
+
+        return fig, ax
 
     def update_plot(self, frame):
         for i, line in enumerate(self.lines):
+            vehicle = self.uam_env.corridors.vehicles[i]
             data = self.uam_env.corridors.vehicles[i].plane.data_handler
-            
+            #set the color of the vehicle based on the agent
+            if vehicle.crashed:
+                line.set_color('black')
             # Update the data of the line and scatter
             line.set_data(data.x[:frame], data.y[:frame])
             line.set_3d_properties(data.z[:frame])

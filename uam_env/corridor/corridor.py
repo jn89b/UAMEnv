@@ -366,7 +366,6 @@ class Corridor(object):
             for other in self.objects:
                 vehicle.handle_collisions(other, dt)
             
-
     def close_objects_to(
         self, 
         vehicle: "IDMVehicle",
@@ -391,21 +390,19 @@ class Corridor(object):
         #TODO: might need to refactor this I'm going to have to do 
         # two calculations
         close_objects = {}
-        
-        #create keys for number of vehicles
-        for i in range(count):
-            close_objects[i] = None
             
         #TODO: Add a queue to sort the closest vehicles
         num_vehicle = 0 
-        for other_vehicle in self.vehicles:
+    
+        for i, other_vehicle in enumerate(self.vehicles):
             other_vehicle : IDMVehicle
+    
             if other_vehicle.agent == False:
-                distance = np.linalg.norm(vehicle.position - other_vehicle.position)
-                signed_distance = vehicle.lane_distance_to(other_vehicle, 
-                                                           other_vehicle.lane)
-                if distance <= distance_threshold and \
-                    abs(signed_distance) <= kinematics_config.MAX_SPEED_MS * 2:
+                distance = np.linalg.norm(
+                    vehicle.position - other_vehicle.position)
+                signed_distance = vehicle.lane_distance_to(
+                    other_vehicle, other_vehicle.lane)
+                if distance <= distance_threshold:
                     relative_velocity = np.linalg.norm(
                         vehicle.velocity - other_vehicle.velocity)
                     close_objects[num_vehicle] = {
@@ -414,9 +411,32 @@ class Corridor(object):
                         'object': other_vehicle
                     }
                     num_vehicle += 1
-            if num_vehicle == count:
-                break
-    
+
+        #sort the dictionary
+        if sort:
+            close_objects = dict(sorted(
+                close_objects.items(), 
+                key=lambda item: item[1]['distance']))
+            
+        # #check the length of the dictionary
+        # if we havce less than the count we need to add None 
+        if len(close_objects) < count:
+            remaining = count - len(close_objects)
+            for i in range(remaining):
+                close_objects[len(close_objects) + i] = None
+            
+        # if we have more than the count we need to remove the last elements
+        elif len(close_objects) > count:
+            for i in range(count, len(close_objects)):
+                close_objects.pop(i)
+        else:
+            pass
+        
+        # # #pretty print the dictionary
+        # for key, value in close_objects.items():
+        #     print(key, value)
+        # print("\n")
+        
         return close_objects
 
     def neighbor_vehicles(self, ego_vehicle:"Vehicle",

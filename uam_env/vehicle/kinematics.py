@@ -76,7 +76,8 @@ class Vehicle(CorridorObject):
         lane_from: Optional[str] = None,
         lane_to: Optional[str] = None,
         lane_id: Optional[int] = None,
-        spacing: float = 1.0
+        spacing: float = 1.0,
+        consider_ego: bool = False
     ) -> "Vehicle":
         """
         Create a random vehicle on the road.
@@ -124,13 +125,14 @@ class Vehicle(CorridorObject):
             #x0 = np.random.uniform(max_value, kinematics_config.LENGTH_m)
         else:
             x0 = 3 * default_spacing     
-        x0 += offset * corridor.np_random.uniform(0.75, 1.0) #+ default_spacing 
+        x0 += offset * corridor.np_random.uniform(0.4, 0.8) #+ default_spacing 
         position = lane.position(longitudinal=x0,lateral=0)
         lane_heading = lane.heading_at()
         vehicle = cls(corridor=corridor, 
                       position=position, 
                       speed=speed,
                       heading_dg=np.rad2deg(lane_heading))
+        print("Creating vehicle at: ", position)
         vehicle.lane_index = _from
         vehicle.lane = lane
         vehicle.target_lane_index = _to
@@ -161,6 +163,13 @@ class Vehicle(CorridorObject):
                             speed_input])
         new_states = self.plane.rk45(
             self.plane.state_info, action, dt)
+        
+        #clip the attitude
+        new_states[3] = np.clip(new_states[3],
+                                -self.plane.max_roll_rad,
+                                self.plane.max_roll_rad)
+        
+        
         self.on_state_update()
         self.plane.set_info(new_states)
     

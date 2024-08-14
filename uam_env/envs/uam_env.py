@@ -6,8 +6,8 @@ from uam_env.config import kinematics_config
 from typing import Dict, List, Optional, Text, Tuple, TypeVar
 from uam_env.config import env_config, kinematics_config, lane_config
 import numpy as np
-import gymnasium as gym
-from gym import spaces
+import gymnasium 
+from gymnasium import spaces
 
 """
 REMEMBER KEEP THIS SIMPLE THEN APPLY MORE COMPLEXITY
@@ -25,10 +25,9 @@ For UAM from our literature review, we need to consider the following:
     - Stay on lateral lane and get to the vertical passing zone
     - Stay on vertical lane and get to the lateral passing zone
     
-    
 """
 
-class UAMEnv(gym.Env):
+class UAMEnv(gymnasium.Env):
     """
     This is the main environment for the UAM
     """
@@ -41,7 +40,7 @@ class UAMEnv(gym.Env):
         self.time = 0 #simulation time multiply by dt to get seconds 
         self.steps = 0 
         self.done = False
-        self.n_neighbors = 2
+        self.n_neighbors = 3
 
         self.state_constraints = kinematics_config.state_constraints
         self.ego_obs_space = self.init_ego_observation()
@@ -49,16 +48,18 @@ class UAMEnv(gym.Env):
         self.action_space = spaces.Discrete(
             env_config.NUM_ACTIONS)
                 
-        self.observation_space = spaces.Dict(
-            {
-                "ego": self.ego_obs_space
-            })
+        # self.observation_space = spaces.Dict(
+        #     {
+        #         "ego": self.ego_obs_space
+        #     })
         
+        self.observation_space = self.ego_obs_space
+                
         self._create_corridors()
         self._create_vehicles()
         self.goal = self.create_goal()
         print("goal position: ", self.goal.position)
-
+        self.terminal_reward = 50.0
 
     @classmethod
     def default_config(cls) -> dict:
@@ -132,11 +133,10 @@ class UAMEnv(gym.Env):
         n_states = 2
         relative_max_distance = lane_config.LANE_LENGTH_M
         for _ in range(self.n_neighbors):
-            for _ in range(n_states):
-                low_obs.append(-relative_max_distance)
-                high_obs.append(relative_max_distance)
-                low_obs.append(-kinematics_config.MAX_SPEED_MS)
-                high_obs.append(kinematics_config.MAX_SPEED_MS)
+            low_obs.append(-relative_max_distance)
+            high_obs.append(relative_max_distance)
+            low_obs.append(-kinematics_config.MAX_SPEED_MS)
+            high_obs.append(kinematics_config.MAX_SPEED_MS)
         
         obs_space = spaces.Box(low=np.array(low_obs),
                                             high=np.array(high_obs),
@@ -164,8 +164,11 @@ class UAMEnv(gym.Env):
         ego_position = self.vehicle.position    
         min_x = ego_position[0]
         
+        random_distance = np.random.uniform(
+            200, lane_config.LANE_LENGTH_M)
+        
         lane_position = lateral_lane.position(
-            longitudinal=min_x + 200,
+            longitudinal=min_x + random_distance,
             lateral=0,
         )
         goal = Vehicle(
@@ -178,15 +181,26 @@ class UAMEnv(gym.Env):
         return goal 
     
 
-    def reset(self) -> None:
+    def reset(self, seed=None, options=None) -> Tuple[np.ndarray, Dict]:
+        # super().reset(seed=seed)
+
         """
         Reset the environment
         """
+        # Seed the random number generator if a seed is provided
+        if seed is not None:
+            #self.np_random, seed = gym.utils.seeding.np_random(seed)
+            pass
+        
         self._create_corridors()
         self._create_vehicles()
         self.time = 0
+        self.goal = self.create_goal(set_random=True)
+        info = {}
+        obs = self._get_observation()
         
-        #make sure to randomize the goal position
+        return (obs, info)
+        # return self._get_observation()
         
     def _create_vehicles(self) -> None:
         """
@@ -201,8 +215,8 @@ class UAMEnv(gym.Env):
             + n_non_controlled
         
         #random index to spawn the controlled vehicle
-        random_number = np.random.randint(0, total_vehicles)
-        
+        random_number = np.random.randint(0, int(total_vehicles/2))
+        SPAWNED_EGO = False
         for i in range(total_vehicles):
             random_speed = np.random.uniform(
                 kinematics_config.MIN_SPEED_MS,
@@ -218,7 +232,21 @@ class UAMEnv(gym.Env):
                     spacing=self.config["ego_spacing"]                
                 )
                 self.controlled_vehicles.append(vehicle)
+                SPAWNED_EGO = True
             else:
+                """
+                If the ego has been spawned then we want to s
+                """
+                # if SPAWNED_EGO:
+                #     vehicle = IDMVehicle.create_random(
+                #         corridor=self.corridors,
+                #         speed=random_speed,
+                #         lane_from=self.config["initial_lane_id"],
+                #         lane_id=self.config["initial_lane_id"],
+                #         spacing=self.config["ego_spacing"], 
+                #         consider_ego=True                
+                #     )
+                # else:
                 vehicle = IDMVehicle.create_random(
                     corridor=self.corridors,
                     speed=random_speed,
@@ -241,11 +269,14 @@ class UAMEnv(gym.Env):
         n_neighbors = self.n_neighbors
         neighbors = self.corridors.close_objects_to(
             vehicle=self.vehicle,
-            distance_threshold=250,
+            distance_threshold=env_config.DISTANCE_THRESHOLD,
             count=n_neighbors,
             see_behind=True,
             sort=True,
             vehicles_only=True)
+        
+        count = 0
+                
         for k, v in neighbors.items():
             #auto fill the relative position and velocity
             rel_pos_vel = np.array([
@@ -255,15 +286,43 @@ class UAMEnv(gym.Env):
             if v is not None:
                 rel_pos_vel[0] = v['distance']
                 rel_pos_vel[1] = v['velocity']
-
+                
+            rel_pos_vel[0] = np.clip(rel_pos_vel[0], 
+                                  -lane_config.LANE_LENGTH_M, 
+                                  lane_config.LANE_LENGTH_M)
+            rel_pos_vel[1] = np.clip(rel_pos_vel[1],
+                                    -kinematics_config.MAX_SPEED_MS,
+                                    kinematics_config.MAX_SPEED_MS)
             #append the ego state to the neighbors
             ego_state = np.append(ego_state, rel_pos_vel)
-
-        return {
-            "ego": ego_state,
-            "neighbors": neighbors
-        }
-    
+        
+        # #check size of the observation
+        if ego_state.shape[0] != self.ego_obs_space.shape[0]:
+            print("Observation size: ", len(ego_state))
+            print("Observation space: ", self.ego_obs_space.shape[0])
+            raise ValueError(
+                "Observation size does not match the observation space"
+            )
+        #     #fill the observation space with max values
+        #     left_over = self.ego_obs_space.shape[0] - len(ego_state)
+        #     for _ in range(left_over):
+        #         rel_pos_vel = np.array([
+        #             lane_config.LANE_LENGTH_M,
+        #             lane_config.SPEED_LIMIT_MS,
+        #         ])
+        #         ego_state = np.append(ego_state, rel_pos_vel)
+        
+        #make sure type is float32
+        ego_state = ego_state.astype(np.float32)
+        
+            # print("Observation size: ", len(ego_state))
+            # print("Observation space: ", self.ego_obs_space.shape[0])
+            # raise ValueError(
+            #     "Observation size does not match the observation space"
+            # )
+            
+        return ego_state
+        
     def get_results(self, obs:np.ndarray) -> Dict:
         """
         Reward is :
@@ -290,54 +349,55 @@ class UAMEnv(gym.Env):
         }
         
         ## TERMINAL REWARDS 
-        terminal_penalty = -5.0
-        terminal_reward = 5.0
         if self.vehicle.crashed:
+            print("Vehicle crashed")
             result_dict["is_done"] = True
-            result_dict["reward"] = -1.0
+            result_dict["reward"] = -150.0
             return result_dict
-
+        
+        #check if beyond the limits of the lane
         distance = self.vehicle.lane_distance_to(
             self.goal, self.goal.lane
         )
                         
-        if self.vehicle.lane_index == self.goal.lane_index:
-            #we missed the goal
-            if distance < 0:
-                result_dict["is_done"] = True
-                result_dict["reward"] = -1.0
-                return result_dict
-            elif distance < 5.0 and distance <= 0:
-                result_dict["is_done"] = True
-                result_dict["reward"] = 1.0
-                return result_dict
-            
         #check time limit
         if self.time > self.max_num_steps:
+            print("Time limit reached")
             result_dict["is_done"] = True
-            result_dict["reward"] = -1.0
+            result_dict["reward"] = self.terminal_reward
             return result_dict
              
         ## REWARD SHAPING
-        relative_states = obs[n_states:]
-        relative_positions = relative_states[::2]
+        relative_states     = obs[n_states:]
+        relative_positions  = relative_states[::2]
         relative_velocities = relative_states[1::2]
         
-        # reward for staying on desired lane
+        velocity = self.vehicle.speed
+        speed_limit = lane_config.SPEED_LIMIT_MS
+        #penalty for not matching speed limit
+        if velocity <= speed_limit - 5:
+            result_dict["reward"] -= 0.01
+        else:
+            result_dict["reward"] += 0.01
+        
         # not to be confused with goal position
-        target_lane_index = self.vehicle.target_lane_index 
+        target_lane_index = lane_config.LANE_LATERAL_KEY
         target_lane:StraightLane = \
             self.corridors.lane_network.lanes[target_lane_index]
         if target_lane.on_lane(self.vehicle.position):
-            result_dict["reward"] += 0.1
+            result_dict["reward"] = 0.1
         else:
-            result_dict["reward"] -= 0.1
+            result_dict["reward"] = -0.1
 
         # TODO: reward for maintaining safe distance from other vehicles
         # maintain safe distance from other vehicles
+        for distance in relative_positions:
+            if abs(distance) <= kinematics_config.BUFFER_SPACING_M:
+                result_dict["reward"] -= 0.1
+            else:
+                result_dict["reward"] += 0.1
         
-        #TODO: penalty for timer
-        result_dict["reward"] -= 0.01
+        # #TODO: penalty for timer
         
         return result_dict
         
@@ -377,10 +437,10 @@ class UAMEnv(gym.Env):
         info = {}
         self.simulate(action)        
         obs = self._get_observation()
-        results = self.get_results(obs['ego'])
+        results = self.get_results(obs)
         self.time += 1
         
-        reward += results['reward']
+        reward = results['reward']
         terminated = results['is_done']
         truncated = results['is_done']
         info = results['info']
